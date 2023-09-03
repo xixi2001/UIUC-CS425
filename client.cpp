@@ -12,87 +12,95 @@
 #include<sys/timeb.h>
 #include<netdb.h>
 #include<unistd.h>
+#include <fstream>
+#include <iostream>
 using namespace std;
 
-int packet_num=0;
-int time_out=1000;
-int nextone=1;
+constexpr int time_out=1000;
+vector<string> machines = {"fa23-cs425-2401.cs.illinois.edu"};
+constexpr int server_port = 8821;
+constexpr int max_buffer_size = 1e4 + 7;
 
-long long gettime(){//https://blog.csdn.net/kangruihuan/article/details/59055801
-	timeb t;
-	ftime(&t);
-	return t.time * 1000 + t.millitm;
+char cmd[max_buffer_size];// read only in send_grep_request
+char buf[max_buffer_size];
+void send_grep_request(int machine_idx){
+	const auto curMachine = machines[machine_idx];
+	ofstream tempLogFile(curMachine + ".log");
+	
+	int fd;
+	if((fd=socket(AF_INET,SOCK_STREAM,0))<0){//create a socket
+		throw("socket build fail");
+		exit(1);
+	}
+	struct sockaddr_in srv;
+	srv.sin_family=AF_INET;
+	srv.sin_port=server_port;
+	srv.sin_addr.s_addr=inet_addr(curMachine.c_str());
+	if(srv.sin_addr.s_addr==-1){
+		struct hostent *host=new struct hostent;
+		host=gethostbyname(curMachine.c_str());
+		srv.sin_addr=*((struct in_addr *)host->h_addr);
+	}
+	if((connect(fd, (struct sockaddr*) &srv,sizeof(srv)))<0){//connect the socket
+		throw("timeout when connect to" + curMachine); 
+	}
+
+	int nbytes;
+	if((nbytes=write(fd, cmd, sizeof(cmd)))<0){ 
+		throw("socket write fail"); 
+	}
+	if((nbytes=read(fd, buf, sizeof(buf))) < 0){
+		throw("socket read fail"); 
+	}
+	cout << "line nbytes: " << nbytes << endl;
+	int line_cnt = stoi(buf);
+	printf("grep %d lines\n", line_cnt);
+	for(int i=1;i<=line_cnt;i++) {
+		nbytes = read(fd, buf, sizeof(buf));
+		if(nbytes < 0){
+			throw("socket read fail"); 
+		}
+		else if(nbytes == 0)
+			break;
+		else{
+			for(int i=0;i<=20;i++)cout << buf[i] << ", ";
+			cout << endl;
+			cout << nbytes << endl;
+			tempLogFile << buf;
+			cout << "get: " << buf << endl;
+		}
+	}
+
+	tempLogFile.close();
+
+	/*string myText;
+	ifstream MyReadFile(curMachine + ".log");
+	while (getline (MyReadFile, myText)) 
+		cout << myText << endl;
+	MyReadFile.close();*/
+
+	close(fd);	
 }
 
-
-
 int main(int argc, char *argv[]){
-	if(strcmp(argv[1],"-n")==0){
-		packet_num=stoi(argv[2]); nextone=3;
-	}
-	else if(strcmp(argv[1],"-t")==0){
-		time_out=stoi(argv[2]); nextone=3;
-	}
-	if(argc>3){
-		if(strcmp(argv[3],"-n")==0){
-			packet_num=stoi(argv[4]); nextone=5;
-		}
-		else if(strcmp(argv[3],"-t")==0){
-			time_out=stoi(argv[4]); nextone=5;
-		}
-	}
-	for(int i=nextone;i<argc;i++){//依序處理參數裡的 [ip_addr : port]
-		char help[256];
-		strcpy(help,argv[i]);
-		char delim[] = ":";
-		char *hostip;
-		hostip=strtok(help,delim);
-		int hostport=stoi(strtok(NULL,delim));
-		int fd;
-		if((fd=socket(AF_INET,SOCK_STREAM,0))<0){//create a socket
-			perror("socket");
-			exit(1);
-		}
-		struct sockaddr_in srv;
-		srv.sin_family=AF_INET;
-		srv.sin_port=hostport;
-		srv.sin_addr.s_addr=inet_addr(hostip);
-		if(srv.sin_addr.s_addr==-1){
-			struct hostent *host=new struct hostent;
-			host=gethostbyname(hostip);
-			if(host==NULL) perror("oops");
-			srv.sin_addr=*((struct in_addr *)host->h_addr);
-		}
-		char *t=inet_ntoa(srv.sin_addr);
-		//printf("%s",t);
-		if((connect(fd, (struct sockaddr*) &srv,sizeof(srv)))<0){//connect the socket
-			printf("timeout when connect to %s:%hu\n",t,srv.sin_port); 
-			continue;
-		}
-		int nbytes;
-		char buf[512];
-		sprintf(buf, "%d", packet_num);
-		long long start=gettime();
-		for(int i=(packet_num==0)? -1:0;i<packet_num;i++){
-			long long ith_packet=gettime();
-			if((nbytes=write(fd, buf, sizeof(buf)))<0){//"read" will block until receive data 
-				printf("timeout when connect to %s:%hu\n",t,srv.sin_port); 
-				break;
+	while(true){
+		cin.getline(cmd, max_buffer_size);
+		cout << "cmd: " << cmd << endl;
+		for(int idx = 0; idx < machines.size(); idx++){
+			try{
+				send_grep_request(idx);
+			} catch (const char* msg) {
+				cerr << msg << endl;
+			}catch (exception &e) {
+				cerr << "error: " << e.what() << endl;
 			}
-			if((nbytes=read(fd, buf, sizeof(buf)))<0){//"read" will block until receive data 
-				printf("timeout when connect to %s:%hu\n",t,srv.sin_port); 
-				break;
-			}
-			long long end=gettime();
-			if(end-start<=time_out)
-				printf("recv from %s:%hu, RTT = %lld msec\n",t,srv.sin_port,end-ith_packet);
-			else{
-				printf("timeout when connect to %s:%hu\n",t,srv.sin_port);
-				break;
-			}
-			if(packet_num==0) i--;
-		} 	
-		close(fd);
+			// const auto curMachine = machines[idx];
+			// string myText;
+			// ifstream MyReadFile(curMachine + ".log");
+			// while (getline (MyReadFile, myText)) 
+			// 	cout << myText << endl;
+			// MyReadFile.close();
+		}
 	}
 
 }
