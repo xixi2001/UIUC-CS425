@@ -16,15 +16,19 @@
 
 using namespace std;
 constexpr int max_buffer_size = 1e4 + 7;
-constexpr int listen_port = 8821;
+constexpr int listen_port = 8822;
 char cmd[max_buffer_size];
 char buffer[max_buffer_size];
 
 int main(int argc, char *argv[]){
 	string machine_number = argv[1];
+	if(argc != 2){
+		puts("FATAL: please assign machine number!");
+		return 0;
+	}
 	int fd;
 	if((fd=socket(AF_INET,SOCK_STREAM,0))<0){//open a socket
-		perror("socket build fail");
+		perror("FATAL: socket build fail");
 		exit(1);
 	}
 	struct sockaddr_in srv;
@@ -32,28 +36,27 @@ int main(int argc, char *argv[]){
 	srv.sin_port=listen_port;
 	srv.sin_addr.s_addr=htonl(INADDR_ANY);
 	if((bind(fd, (struct sockaddr*) &srv,sizeof(srv)))<0){
-		perror("socket bind fail");
+		perror("FATAL: socket bind fail");
 		exit(1);
 	}
 	if( listen(fd,10)<0 ){
-		perror("socket listen fail");
+		perror("FATAL: socket listen fail");
 		exit(1);
 	}
 	struct sockaddr_in cli;
 	int clifd;
-	socklen_t cli_len=sizeof(cli);
+	socklen_t cli_len = sizeof(cli);
+	printf("Server %s lisening on port: %d\n", argv[1], listen_port);
 	while(1){
 		clifd=accept(fd, (struct sockaddr*) &cli, &cli_len);//block until accept connection
 		if(clifd<0){
-			perror("socket accept fail");
+			perror("FATAL: socket accept fail");
 			exit(1);
 		}
 		int nbytes;
 		if((nbytes=read(clifd, cmd, sizeof(cmd)))<0){//"read" will block until receive data 
-			perror("socket read fail");
+			perror("FATAL: socket read fail");
 		}
-
-		
 		unique_ptr<FILE, decltype(&pclose)> pipe(popen(strcat(cmd, (" machine."+ machine_number + ".log").c_str()), "r"), pclose);
 		if (!pipe) {
 			throw std::runtime_error("popen() failed!");
@@ -67,16 +70,16 @@ int main(int argc, char *argv[]){
 		tempLogFile.close();
 		sprintf(buffer, "%d", line_cnt);
 		if((nbytes=write(clifd, buffer, sizeof(buffer)))<0){// send the number of lines first
-			perror("socket write fail");
+			perror("FATAL: socket write fail");
 		}
 		ifstream readLogFile("grep_tmp_"+ machine_number + ".log");
 		if(!readLogFile){
-			throw("cannot open temp file");
+			throw("FATAL: cannot open temp file");
 		}
 		string str;
 		while (readLogFile.getline(buffer, max_buffer_size)) {
 			if((nbytes=write(clifd, buffer, sizeof(buffer)))<0){//send the content
-				perror("socket write fail");
+				throw("FATAL: socket write fail");
 			}
 			cout << "send " << buffer << endl;;
 		}
