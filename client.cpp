@@ -31,8 +31,7 @@ const vector<string> machines = {
 	"fa23-cs425-2410.cs.illinois.edu"
 };
 constexpr int server_port = 8822;
-constexpr int max_buffer_size = 1e4 + 7;
-constexpr int time_out_second = 2;
+constexpr int max_buffer_size = 1024;
 
 char cmd[max_buffer_size];// read only in send_grep_request, no mutex needed
 void send_grep_request(int machine_idx){
@@ -56,17 +55,18 @@ void send_grep_request(int machine_idx){
 		throw(error_title + " timeout when connecting" ); 
 	}
 	int nbytes;
-	if((nbytes=write(fd, cmd, sizeof(cmd)))<0){ 
+	if((nbytes=send(fd, cmd, sizeof(cmd), 0))<0){ 
 		throw(error_title + " socket write fail"); 
 	}
 	char buf[max_buffer_size];
-	if((nbytes=read(fd, buf, sizeof(buf))) < 0){
+	if((nbytes=recv(fd, buf, sizeof(buf),0)) < 0){
 		throw(error_title + " read line cnt fail"); 
 	}
 	int line_cnt = stoi(buf);
 	ofstream temp_log("grep_receive_result_" + to_string(machine_idx)  + ".log");
 	for(int i=1;i<=line_cnt;i++) {
-		nbytes = read(fd, buf, sizeof(buf));
+		memset(buf, 0, sizeof(buf));
+		nbytes = recv(fd, buf, sizeof(buf),0);
 		if(nbytes < 0){
 			throw(error_title + " read line " + to_string(line_cnt) + " fail"); 
 		}
@@ -74,7 +74,7 @@ void send_grep_request(int machine_idx){
 			break;
 		else{
 			temp_log << buf << endl;
-			// cout << "get: " << buf << endl;
+			cout << "machine " << machine_idx+1 << " get: " << buf << endl;
 		}
 	}
 	temp_log.close();

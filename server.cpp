@@ -15,7 +15,7 @@
 #include <fstream>
 
 using namespace std;
-constexpr int max_buffer_size = 1e4 + 7;
+constexpr int max_buffer_size = 1024;
 constexpr int listen_port = 8822;
 char cmd[max_buffer_size];
 char buffer[max_buffer_size];
@@ -54,7 +54,7 @@ int main(int argc, char *argv[]){
 			exit(1);
 		}
 		int nbytes;
-		if((nbytes=read(clifd, cmd, sizeof(cmd)))<0){//"read" will block until receive data 
+		if((nbytes=recv(clifd, cmd, sizeof(cmd),0))<0){//"read" will block until receive data 
 			perror("FATAL: socket read fail");
 		}
 		unique_ptr<FILE, decltype(&pclose)> pipe(popen(strcat(cmd, (" machine."+ machine_number + ".log").c_str()), "r"), pclose);
@@ -69,7 +69,7 @@ int main(int argc, char *argv[]){
 		}
 		tempLogFile.close();
 		sprintf(buffer, "%d", line_cnt);
-		if((nbytes=write(clifd, buffer, sizeof(buffer)))<0){// send the number of lines first
+		if((nbytes=send(clifd, buffer, sizeof(buffer),0))<0){// send the number of lines first
 			perror("FATAL: socket write fail");
 		}
 		ifstream readLogFile("grep_tmp_"+ machine_number + ".log");
@@ -78,10 +78,11 @@ int main(int argc, char *argv[]){
 		}
 		string str;
 		while (readLogFile.getline(buffer, max_buffer_size)) {
-			if((nbytes=write(clifd, buffer, sizeof(buffer)))<0){//send the content
+			if((nbytes=send(clifd, buffer, sizeof(buffer),0))<0){//send the content
 				throw("FATAL: socket write fail");
 			}
 			cout << "send " << buffer << endl;;
+			memset(buffer,0,sizeof(buffer));
 		}
 
 		// if((nbytes=write(clifd, "-", sizeof("-")))<0){
