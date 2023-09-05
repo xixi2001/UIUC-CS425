@@ -77,7 +77,7 @@ int main(int argc, char *argv[]){
     test_input.close();
     ofstream test_result("test.result");
     //Generate input file and output file
-    for(int i = 1;i <= 2;i++){
+    for(int i = 1;i <= 10;i++){
         test_result << "==================== grep result from machine " << i << " ====================" << endl;
         ofstream log_output("machine." + to_string(i) + ".log");
         int budget = traget_total_length;
