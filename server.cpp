@@ -23,8 +23,8 @@ char buffer[max_buffer_size];
 int main(int argc, char *argv[]){
 	string machine_number = argv[1];
 	if(argc != 2){
-		puts("FATAL: please assign machine number!");
-		return 0;
+		perror("FATAL: please assign machine number!");
+		exit(1);
 	}
 	int fd;
 	if((fd=socket(AF_INET,SOCK_STREAM,0))<0){//open a socket
@@ -39,7 +39,7 @@ int main(int argc, char *argv[]){
 		perror("FATAL: socket bind fail");
 		exit(1);
 	}
-	if( listen(fd,10)<0 ){
+	if(listen(fd,10)<0) {
 		perror("FATAL: socket listen fail");
 		exit(1);
 	}
@@ -56,10 +56,13 @@ int main(int argc, char *argv[]){
 		int nbytes;
 		if((nbytes=recv(clifd, cmd, sizeof(cmd),0))<0){//"read" will block until receive data 
 			perror("FATAL: socket read fail");
+			exit(1);
 		}
+		// excute the command the save the result to a temporary file
 		unique_ptr<FILE, decltype(&pclose)> pipe(popen(strcat(cmd, (" machine."+ machine_number + ".log").c_str()), "r"), pclose);
 		if (!pipe) {
-			throw std::runtime_error("popen() failed!");
+			perror("FATAL: popen() failed!");
+			exit(0);
 		}
 		int line_cnt = 0;
 		ofstream tempLogFile("grep_tmp_"+ machine_number + ".log");
@@ -69,26 +72,22 @@ int main(int argc, char *argv[]){
 		}
 		tempLogFile.close();
 		sprintf(buffer, "%d", line_cnt);
-		if((nbytes=send(clifd, buffer, sizeof(buffer),0))<0){// send the number of lines first
+		// send the number of lines first
+		if((nbytes=send(clifd, buffer, sizeof(buffer),0))<0){
 			perror("FATAL: socket write fail");
 		}
 		ifstream readLogFile("grep_tmp_"+ machine_number + ".log");
 		if(!readLogFile){
-			throw("FATAL: cannot open temp file");
+			perror("FATAL: cannot open temp file");
 		}
-		string str;
+		//send the grep result
 		while (readLogFile.getline(buffer, max_buffer_size)) {
-			if((nbytes=send(clifd, buffer, sizeof(buffer),0))<0){//send the content
+			if((nbytes=send(clifd, buffer, sizeof(buffer),0))<0){
 				throw("FATAL: socket write fail");
 			}
 			cout << "send " << buffer << endl;;
 			memset(buffer,0,sizeof(buffer));
 		}
-
-		// if((nbytes=write(clifd, "-", sizeof("-")))<0){
-		// 		perror("socket write finish fail");
-		// }
-		puts("grep success!");
 		close(clifd);
 	}
 	close(fd);

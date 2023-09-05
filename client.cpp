@@ -54,16 +54,19 @@ void send_grep_request(int machine_idx){
 	if((connect(fd, (struct sockaddr*) &srv,sizeof(srv)))<0){
 		throw(error_title + " timeout when connecting" ); 
 	}
+	// send command to the server
 	int nbytes;
 	if((nbytes=send(fd, cmd, sizeof(cmd), 0))<0){ 
 		throw(error_title + " socket write fail"); 
 	}
+	// first read the numbers of lines to be received
 	char buf[max_buffer_size];
 	if((nbytes=recv(fd, buf, sizeof(buf),0)) < 0){
 		throw(error_title + " read line cnt fail"); 
 	}
 	int line_cnt = stoi(buf);
 	ofstream temp_log("grep_receive_result_" + to_string(machine_idx)  + ".log");
+	// read the grep result and save to the temporary log
 	for(int i=1;i<=line_cnt;i++) {
 		memset(buf, 0, sizeof(buf));
 		nbytes = recv(fd, buf, sizeof(buf),0);
@@ -85,7 +88,7 @@ bool is_alive[machine_number];// each handler only access its corresponding is_a
 void send_grep_request_handler(int machine_idx){
 	try{
 		send_grep_request(machine_idx);
-	}catch ( string msg) {
+	} catch (string msg) {
 		cerr << msg << endl;
 		is_alive[machine_idx] = false;
 	} catch (exception &e) {
@@ -96,12 +99,13 @@ void send_grep_request_handler(int machine_idx){
 int main(int argc, char *argv[]){
 	memset(is_alive,1,sizeof(is_alive));
 	while(cin.getline(cmd, max_buffer_size)){
+		//send the request using thread
 		for(int idx = 0; idx < machines.size(); idx++){
 			thread request(send_grep_request_handler, idx);
 			request.join();
 		}
 		int total_line_cnt = 0;
-		
+		// read the result from the logs and merge the result
 		for(int idx = 0; idx < machines.size(); idx++){
 			if(!is_alive[idx]){
 				printf("==================== machine %d is dead ====================\n", idx + 1);// VM idx starts from 1
