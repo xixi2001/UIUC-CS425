@@ -74,12 +74,12 @@ void send_grep_request(int machine_idx){
 			break;
 		else{
 			temp_log << buf << endl;
-			cout << "machine " << machine_idx+1 << " get: " << buf << endl;
+			// cout << "machine " << machine_idx+1 << " get: " << buf << endl;
 		}
 	}
 	temp_log.close();
 	close(fd);
-	printf("INFO: Grep from machine %d finished\n", machine_idx);
+	// printf("INFO: Grep from machine %d finished\n", machine_idx);
 }
 bool is_alive[machine_number];// each handler only access its corresponding is_alive no mutex needed
 void send_grep_request_handler(int machine_idx){
@@ -95,8 +95,7 @@ void send_grep_request_handler(int machine_idx){
 }
 int main(int argc, char *argv[]){
 	memset(is_alive,1,sizeof(is_alive));
-	while(true){
-		cin.getline(cmd, max_buffer_size);
+	while(cin.getline(cmd, max_buffer_size)){
 		for(int idx = 0; idx < machines.size(); idx++){
 			thread request(send_grep_request_handler, idx);
 			request.join();
