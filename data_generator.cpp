@@ -5,7 +5,7 @@
 using namespace std;
 constexpr int grep_key_length = 20;
 constexpr int line_max_length =  1024;
-constexpr int traget_total_length = 40 * (1<<20);
+constexpr int traget_total_length = 1<<15;
 constexpr int random_key = 19260817;
 inline char RandChar(){
     if(rand() & 1)
@@ -16,8 +16,7 @@ int f[line_max_length];char s[line_max_length], n;
 void GetFail(){ // Use KMP to server Grep
     n = strlen(s);
 	f[0] = f[1] = 0;
-	for(int i=1;i<n;i++)
-	{
+	for(int i=1;i<n;i++){
 		int j = f[i];
 		while(s[j]!=s[i]&&j)j=f[j];
 		f[i+1] = s[j] == s[i]? j+1:0;
