@@ -61,11 +61,11 @@ int main(int argc, char *argv[]){
         // use random patter as default pattern
         for(int i=0;i<grep_key_length;i++)s[i] = RandChar(); // default rand
     }else{
-        if(argv[1] == "frequent"){
+        if(strcmp(argv[1],"frequent") == 0){
             sprintf(s, "the");
-        } else if (argv[1] == "medium"){
+        } else if (strcmp(argv[1],"medium") == 0){
             sprintf(s, "ba");
-        } else if (argv[1] == "all"){
+        } else if (strcmp(argv[1],"all") == 0){
             sprintf(s, "a");
         } else{// default as rare
             for(int i=0;i<grep_key_length;i++)s[i] = RandChar();
