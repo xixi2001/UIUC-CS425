@@ -59,7 +59,7 @@ int main(int argc, char *argv[]){
 			exit(1);
 		}
 		// excute the command the save the result to a temporary file
-		unique_ptr<FILE, decltype(&pclose)> pipe(popen(strcat(cmd, (" machine."+ machine_number + ".log").c_str()), "r"), pclose);
+		unique_ptr<FILE, decltype(&pclose)> pipe(popen(strcat(cmd, ( machine_number + ".log").c_str()), "r"), pclose);
 		if (!pipe) {
 			perror("FATAL: popen() failed!");
 			exit(0);
@@ -71,23 +71,24 @@ int main(int argc, char *argv[]){
 			tempLogFile << buffer;
 		}
 		tempLogFile.close();
-		sprintf(buffer, "%d", line_cnt);
-		// send the number of lines first
-		if((nbytes=send(clifd, buffer, sizeof(buffer),0))<0){
-			perror("FATAL: socket write fail");
-		}
+		// sprintf(buffer, "%d", line_cnt);
+		// // send the number of lines first
+		// if((nbytes=send(clifd, buffer, sizeof(buffer),0))<0){
+		// 	perror("FATAL: socket write fail");
+		// }
 		ifstream readLogFile("grep_tmp_"+ machine_number + ".log");
 		if(!readLogFile){
 			perror("FATAL: cannot open temp file");
 		}
+		string str((istreambuf_iterator<char>(readLogFile)), istreambuf_iterator<char>());
+		const char *c_str = str.c_str();
 		//send the grep result
-		while (readLogFile.getline(buffer, max_buffer_size)) {
-			if((nbytes=send(clifd, buffer, sizeof(buffer),0))<0){
-				throw("FATAL: socket write fail");
-			}
-			cout << "send " << buffer << endl;;
-			memset(buffer,0,sizeof(buffer));
+		if((nbytes=send(clifd, c_str, strlen(c_str),0))<0){
+			throw("FATAL: socket write fail");
 		}
+		cout << "send ";
+		for(int i=0;i<sizeof(c_str);i++)cout << c_str[i] << " ";
+		
 		close(clifd);
 	}
 	close(fd);

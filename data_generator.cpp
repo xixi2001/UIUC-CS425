@@ -5,7 +5,7 @@
 using namespace std;
 constexpr int grep_key_length = 20;
 constexpr int line_max_length =  1024;
-constexpr int traget_total_length = 1<<15;
+constexpr int traget_total_length = 40 * (1<<20);
 constexpr int random_key = 19260817;
 inline char RandChar(){
     if(rand() & 1)
@@ -73,12 +73,12 @@ int main(int argc, char *argv[]){
     }
     GetFail();
     ofstream test_input("test.input");
-    test_input << "grep " << s << endl;
+    test_input << "grep " << s  << " machine." << endl;
     test_input.close();
     ofstream test_result("test.result");
     //Generate input file and output file
     for(int i = 1;i <= 10;i++){
-        test_result << "==================== grep result from machine " << i << " ====================" << endl;
+        // test_result << "==================== grep result from machine " << i << " ====================" << endl;
         ofstream log_output("machine." + to_string(i) + ".log");
         int budget = traget_total_length;
         for(int j = 1; j <= 2 * traget_total_length / line_max_length; j++){
@@ -96,7 +96,7 @@ int main(int argc, char *argv[]){
         }
         log_output.close();
     }
-    test_result << "total "  << total_line_cnt << " lines grep." << endl; 
+    // test_result << "total "  << total_line_cnt << " lines grep." << endl; 
     test_result.close();
     
 }
