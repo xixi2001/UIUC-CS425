@@ -8,7 +8,7 @@ Server should be run on every machine that requires grep service.
 
 To compile and run the server:
 ```
-g++ std=c++17 -o server server.cpp
+g++ -std=c++17 -o server server.cpp
 ./server [machine_index]
 ```
 
