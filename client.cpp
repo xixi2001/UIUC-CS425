@@ -75,7 +75,6 @@ void send_grep_request(int machine_idx){
 		memset(buf, 0, sizeof(buf));
 		packet_cnt++;
 	}
-	cout << "total " << packet_cnt << " packets received!" << endl;
 	temp_log.close();
 	close(fd);
 	// printf("INFO: Grep from machine %d finished\n", machine_idx);
