@@ -1,6 +1,6 @@
-./client < test.input > test.out
+./client < test.input
 
-diff test.out test.result > diff_file
+diff grep_result.log test.result > diff_file
 FN=$(awk 'END{print NR}' diff_file)
 
 if [ $FN == '0' ]
