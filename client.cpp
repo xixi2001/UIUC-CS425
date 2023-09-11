@@ -20,16 +20,16 @@ using namespace std;
 
 constexpr int machine_number = 10;
 const vector<string> machines = {
-	// "fa23-cs425-2401.cs.illinois.edu",
+	"fa23-cs425-2401.cs.illinois.edu",
 	"fa23-cs425-2402.cs.illinois.edu",
 	"fa23-cs425-2403.cs.illinois.edu",
 	"fa23-cs425-2404.cs.illinois.edu",
-	"fa23-cs425-2405.cs.illinois.edu"
-	// "fa23-cs425-2406.cs.illinois.edu",
-	// "fa23-cs425-2407.cs.illinois.edu",
-	// "fa23-cs425-2408.cs.illinois.edu",
-	// "fa23-cs425-2409.cs.illinois.edu",
-	// "fa23-cs425-2410.cs.illinois.edu"
+	"fa23-cs425-2405.cs.illinois.edu",
+	"fa23-cs425-2406.cs.illinois.edu",
+	"fa23-cs425-2407.cs.illinois.edu",
+	"fa23-cs425-2408.cs.illinois.edu",
+	"fa23-cs425-2409.cs.illinois.edu",
+	"fa23-cs425-2410.cs.illinois.edu"
 };
 constexpr int server_port = 8822;
 constexpr int max_buffer_size = 1024;
