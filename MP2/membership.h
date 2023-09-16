@@ -18,6 +18,8 @@ struct MemberEntry {
 mutex member_status_lock;
 map<pair<string,int64_t>, MemberEntry> member_status;
 // id: <ip_address, time_stamp>
+
+pair<string, int64_t> machine_id;
  
 bool suspection_mode = 0;// only one writter, no mutex needed
 
@@ -48,9 +50,11 @@ TODO:
 
     }
 */
-map<string, MemberEntry> message_to_member_entry(const string &str);
+map<pair<string,int64_t>, MemberEntry> message_to_member_entry(const string &str);
 
 void combine_member_entry(const map<pair<string,int64_t>, MemberEntry> &other);
+
+vector<string> random_choose_send_target(set<string> &previous_sent);
 
 void heartbeat_sender();
 /*
@@ -76,7 +80,7 @@ TODO:
 
 void join_group();
 /*
-    send message to introducer
+    send message to introducer // message contain ip address & "J"
     while(true){
         if(receive any message){
             update
@@ -88,6 +92,7 @@ void join_group();
 */
 
 void response_join();
+// deal with ip address
 
 void load_introducer_from_file();
 
