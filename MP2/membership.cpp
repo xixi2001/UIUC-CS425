@@ -219,7 +219,7 @@ void heartbeat_sender(){
     set<string> previous_sent;
     int64_t last_update_time = cur_time_in_ms();
     while(true){
-        while(cur_time_in_ms() - last_update_time > 500)continue;
+        while(cur_time_in_ms() - last_update_time < 500)continue;
         last_update_time = cur_time_in_ms();
         //(1) randomly select, reminder: use lock
         vector<string> target_ips;
