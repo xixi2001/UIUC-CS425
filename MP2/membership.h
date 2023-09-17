@@ -12,7 +12,19 @@ struct MemberEntry {
     int64_t time_stamp_ms;
     int64_t heart_beat_counter;
     int status;// 0: failre, 1: suspect, 2: alive
-    int64_t incarnation_count; 
+    int64_t incarnation_count;
+    MemberEntry() {
+        time_stamp_ms = 0;
+        heart_beat_counter = 0;
+        status = 2;
+        incarnation_count = 0;
+    }
+    MemberEntry(int64_t current_time_ms ) {
+        time_stamp_ms = current_time_ms;
+        heart_beat_counter = current_time_ms;
+        status = 2;
+        incarnation_count = 0;
+    }
 };
 
 mutex member_status_lock;
@@ -91,10 +103,12 @@ void join_group();
 
 */
 
-void response_join();
+void response_join(const string &str);
 // deal with ip address
 
 void load_introducer_from_file();
+
+void save_current_status_to_log();
 
 
 int64_t cur_time_in_ms(){
