@@ -36,7 +36,7 @@ pair<string, int64_t> machine_id;
 bool suspection_mode = 0;// only one writter, no mutex needed
 
 mutex fout_lock;
-fstream fout;
+ofstream fout;
 int64_t start_time; // only write in main no mutex needed
 
 int64_t cur_time_in_ms(){
