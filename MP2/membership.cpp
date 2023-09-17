@@ -107,7 +107,6 @@ map<pair<string,int64_t>, MemberEntry> message_to_member_entry(const string &str
         entry.heart_beat_counter = ParseIntUntil(idx, str, '#');
         entry.status = ParseIntUntil(idx, str, '#');
         entry.incarnation_count = ParseIntUntil(idx, str, '#');
-        cout << "->" << ip << " " << stamp << endl;
         res[make_pair(ip, stamp)] = entry;
     }
     return res;
