@@ -217,7 +217,10 @@ vector<string> random_choose_send_target(set<string> &previous_sent){
 void heartbeat_sender(){
     // assume there is only one server on a single ip address
     set<string> previous_sent;
+    int64_t last_update_time = cur_time_in_ms();
     while(true){
+        while(cur_time_in_ms() - last_update_time > 500)continue;
+        last_update_time = cur_time_in_ms();
         //(1) randomly select, reminder: use lock
         vector<string> target_ips;
         try{
@@ -272,7 +275,7 @@ void heartbeat_sender(){
         
             close(sockfd);
         }
-        this_thread::sleep_for(chrono::milliseconds(500));
+        // this_thread::sleep_for(chrono::milliseconds(500));
     }
 }
 
@@ -299,8 +302,11 @@ string member_entry_to_message(){
 
 void failure_detector(){
     // this_thread::sleep_for(chrono::milliseconds(500));
+    int64_t last_update_time = cur_time_in_ms();
     while(true){
         int64_t current_time_ms = cur_time_in_ms();
+        while(cur_time_in_ms() - last_update_time < 250)continue;
+        last_update_time = current_time_ms;
         print_to_log("failure detector begin", false);
         member_status_lock.lock();
 
@@ -355,7 +361,7 @@ void failure_detector(){
         }
         member_status_lock.unlock();
         print_to_log("failure detector end", false);
-        this_thread::sleep_for(chrono::milliseconds(250));
+        // this_thread::sleep_for(chrono::milliseconds(250));
     }
 }
 
