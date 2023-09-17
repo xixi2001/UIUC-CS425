@@ -58,16 +58,12 @@ void message_receiver() {
         string msg(buffer);
         switch(msg[0]){
             case 'J':
-                cout << "Receive join request: " + msg.substr(1) << endl;
+                print_to_log("Receive join request: " + msg.substr(1, 45));
                 response_join(msg.substr(1));
                 break;
             case 'G':
+                print_to_log("Receive gossip request: " + msg.substr(1, 45));
                 combine_member_entry(message_to_member_entry(msg.substr(1)));
-                break;
-            case 'L':
-                member_status_lock.lock();
-                // member_status[]
-                member_status_lock.unlock();
                 break;
             default:
                 throw("FATAL: ");
@@ -99,6 +95,8 @@ string ParseStringUntil(int &idx,const string& str, char c){
 map<pair<string,int64_t>, MemberEntry> message_to_member_entry(const string &str){
     map<pair<string,int64_t>, MemberEntry> res;
     int idx = 0;
+    string machine_ip = ParseStringUntil(idx, str, '#');
+    int64_t time_stamp = ParseIntUntil(idx, str, '#');
     int entry_cnt = ParseIntUntil(idx, str, '#');
     for(int i = 1; i <= entry_cnt; i++) {
         string ip = ParseStringUntil(idx, str, '#');
@@ -117,13 +115,25 @@ map<pair<string,int64_t>, MemberEntry> message_to_member_entry(const string &str
 void combine_member_entry(const map<pair<string,int64_t>, MemberEntry> &other){
     int64_t current_time_ms = cur_time_in_ms();
     member_status_lock.lock();
+    bool is_change = 0;
     for(const auto &[id, entry] : other){
         if(!member_status.count(id)){
             member_status[id] = entry;
+            if(entry.status != 0){
+                print_to_log(node_id_to_string(id) + " has joined");
+                is_change = 1;
+            }
+
         } else{
             auto &correspond = member_status[id];
-            if(entry.status == 0 || correspond.status == 0){
+            if(correspond.status == 0){
                 correspond.status = 0;// failure node should remain failure
+                continue;
+            }
+            if(entry.status == 0) {
+                correspond.status = 0;
+                print_to_log(node_id_to_string(id) + " has failed");
+                is_change = 1;
                 continue;
             }
             // heartbeat
@@ -138,7 +148,15 @@ void combine_member_entry(const map<pair<string,int64_t>, MemberEntry> &other){
                 correspond.incarnation_count = entry.incarnation_count;
                 correspond.status = entry.status;
             }
+            if(id == machine_id && correspond.status == 1) { // self is suspected
+                correspond.incarnation_count++;
+                correspond.status = 2;// alive
+            }
         }
+    }
+    member_status_lock.unlock();
+    if(is_change) {
+        print_membership_list();
     }
 }
 
@@ -184,6 +202,8 @@ vector<string> random_choose_send_target(set<string> &previous_sent){
         }
     }
     member_status_lock.unlock();
+    sort(send_target.begin(), send_target.end());
+    send_target.resize(unique(send_target.begin(), send_target.end()) - send_target.begin());
     return send_target;
 }
 
@@ -196,8 +216,10 @@ void heartbeat_sender(){
 
         //(2) update your own member entry
         int64_t cur_time = cur_time_in_ms();
+        member_status_lock.lock();
         member_status[machine_id].time_stamp_ms = cur_time;
         member_status[machine_id].heart_beat_counter = cur_time;
+        member_status_lock.unlock();
 
         //(3) open socket and send the message
         string msg = "G" + member_entry_to_message();
@@ -205,6 +227,8 @@ void heartbeat_sender(){
             int sockfd;
             struct sockaddr_in servaddr;
             struct hostent *server;
+
+            print_to_log("Send gossip to: " + target_ips[i]);
 
             if ( (sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0 ) {
                 puts("Hearbeat sender connect failed!");
@@ -227,7 +251,7 @@ void heartbeat_sender(){
             if(sendto(sockfd, msg.c_str(), msg.size(),
                 MSG_CONFIRM, (const struct sockaddr *) &servaddr, 
                     sizeof(servaddr)) < 0){
-                        puts("Heartbeat sender fail to send message!");
+                        cout << "Heartbeat sender fail to send message to " + target_ips[i] << endl;
             }
         
             close(sockfd);
@@ -239,6 +263,10 @@ void heartbeat_sender(){
 string member_entry_to_message(){
     member_status_lock.lock();
     stringstream res;
+    res << machine_id.first;
+    res << '#';
+    res << machine_id.second;
+    res << '#';
     res << member_status.size();
     res << '#';
     for(auto id_entry:member_status) {
@@ -254,10 +282,6 @@ string member_entry_to_message(){
 }
 
 void failure_detector(){
-    fstream fout(machine_id.first + ".log");
-    auto GetNodeId = [](const pair<string,int64_t> &machine_id) -> string {
-        return "(" + machine_id.first +", " + std::to_string(machine_id.second)  + ")";
-    };
     while(true){
         int64_t current_time_ms = cur_time_in_ms();
         member_status_lock.lock();
@@ -267,45 +291,42 @@ void failure_detector(){
             if(time_stamp_ms == leave_heart_beat) {
                 //node has leave
                 entry.status = 0; // 0 for failure 
-                fout << GetNodeId(id) << " has left" << endl;
+                print_to_log(node_id_to_string(id) + " has left");
                 has_failure = true;
                 continue;
+            }
+            if(entry.status == 0){
+                if(current_time_ms - time_stamp_ms >= cleanup_time_ms){
+                    member_status.erase(id);
+                }
+                continue; // fail node should not go back to live
             }
             if(suspection_mode) {
                 if(current_time_ms - time_stamp_ms >= suspect_time_ms) {
                     entry.status = 1; // 1 for suspect
-                    fout <<  "Suspect " << GetNodeId(id) << endl;
+                    print_to_log("Suspect " + node_id_to_string(id));
                 }
                 if(current_time_ms - time_stamp_ms >= suspect_time_ms + suspect_timeout_ms) {
                     entry.status = 0; // 0 for failure
-                    fout << GetNodeId(id) << " is failure" << endl;
+                    print_to_log(node_id_to_string(id) + " has failed");
                     has_failure = true;
                 }
             } else{
                 if(current_time_ms - time_stamp_ms >= fail_time_ms){
                     entry.status = 0; // 0 for failure
-                    fout << GetNodeId(id) << " is failure" << endl;
+                    print_to_log(node_id_to_string(id) + " has failed");
                     has_failure = true;
                 }
             }   
         }
-        if(has_failure) {
-            fout << "New Membership List: " << endl;
-            for(const auto&[id, entry] : member_status) {
-                if(entry.status > 0) {
-                    fout << GetNodeId(id);
-                }
-            }
-            fout << endl;
-        }
         member_status_lock.unlock();
+        if(has_failure)print_membership_list();
         save_current_status_to_log();
         sleep(0.5);
     }
 }
 
 void join_group(){
-    // TODO: add machine_id timestamp
     while(true){
         int sockfd_send;
         struct sockaddr_in servaddr;
@@ -387,6 +408,14 @@ void join_group(){
 void response_join(const string &str){
     int idx = 0;
     string ip = ParseStringUntil(idx, str, '#');
+    int64_t time_stamp = ParseIntUntil(idx, str, '#');
+
+    member_status_lock.lock();
+    member_status[{ip, time_stamp}].time_stamp_ms = cur_time_in_ms();
+    member_status[{ip, time_stamp}].heart_beat_counter = time_stamp;
+    member_status_lock.unlock();
+    print_to_log(node_id_to_string({ip, time_stamp}) + " has joined");
+    print_membership_list();
 
     int sockfd_send;
     struct sockaddr_in servaddr;
@@ -436,8 +465,7 @@ void load_introducer_from_file() {
 }
 
 void save_current_status_to_log() {
-    string log_file_name = machine_id.first + to_string(machine_id.second);
-    ofstream fout( log_file_name + ".log");
+    ofstream fout( machine_id.first + ".log");
     fout << member_entry_to_message() << endl;
     fout.close();
 }
@@ -449,6 +477,8 @@ int main(int argc, char *argv[]){
 	}
     machine_id.first = argv[1];
     machine_id.second = cur_time_in_ms();
+    fout = fstream(node_id_to_string(machine_id) + ".log");
+    start_time = cur_time_in_ms();
     if(machine_id.first == introducer_ip_address){ // introducer 
         load_introducer_from_file();
     } else { // others join the group 
@@ -467,7 +497,8 @@ int main(int argc, char *argv[]){
     string input;
     while(cin >> input){
         if(input == "LEAVE") {
-            // send leave message
+            print_to_log(node_id_to_string(machine_id) + " has left");
+            return 0;
         } else if(input == "CHANGE") {
             suspection_mode ^= 1;
             print_current_mode();

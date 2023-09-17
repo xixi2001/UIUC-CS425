@@ -35,6 +35,40 @@ pair<string, int64_t> machine_id;
  
 bool suspection_mode = 0;// only one writter, no mutex needed
 
+mutex fout_lock;
+fstream fout;
+int64_t start_time; // only write in main no mutex needed
+
+int64_t cur_time_in_ms(){
+    return (int64_t) chrono::duration_cast<chrono::milliseconds>(
+            chrono::system_clock::now().time_since_epoch()).count();
+}
+
+inline string node_id_to_string(const pair<string,int64_t> &machine_id) {
+    return "(" + machine_id.first +", " + std::to_string(machine_id.second)  + ")";
+}
+
+inline void print_to_log(const string &str){
+    int64_t current_time_ms = cur_time_in_ms(); 
+    cout << "[" << current_time_ms - start_time << "] " << str << endl;
+    fout_lock.lock();
+    fout << "[" << current_time_ms - start_time << "] " << str << endl;
+    fout_lock.unlock();
+}
+
+void print_membership_list(){
+    member_status_lock.lock();
+    stringstream ss;
+    ss << "New Membership List: " << endl;
+    for(const auto&[id, entry] : member_status) {
+        if(entry.status > 0) {
+            ss << node_id_to_string(id) << " ";
+        }
+    }
+    member_status_lock.unlock();
+    print_to_log(ss.str());
+}
+
 inline void print_current_mode(){
     if(suspection_mode) puts("In Gossip+Suspection Mode");
     else puts("In Gossip Mode");
@@ -109,9 +143,3 @@ void response_join(const string &str);
 void load_introducer_from_file();
 
 void save_current_status_to_log();
-
-
-int64_t cur_time_in_ms(){
-    return (int64_t) chrono::duration_cast<chrono::milliseconds>(
-            chrono::system_clock::now().time_since_epoch()).count();
-}
