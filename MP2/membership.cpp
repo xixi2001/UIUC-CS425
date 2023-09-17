@@ -291,11 +291,8 @@ void failure_detector(){
         member_status_lock.lock();
 
         //update your own member entry
-        int64_t cur_time = cur_time_in_ms();
-        member_status_lock.lock();
-        member_status[machine_id].time_stamp_ms = cur_time;
-        member_status[machine_id].heart_beat_counter = cur_time;
-        member_status_lock.unlock();
+        member_status[machine_id].time_stamp_ms = current_time_ms;
+        member_status[machine_id].heart_beat_counter = current_time_ms;
 
         bool has_failure = false;
         for(auto&[id, entry] : member_status) {
@@ -343,7 +340,7 @@ void failure_detector(){
             exit(0);
         }
         member_status_lock.unlock();
-        
+
         this_thread::sleep_for(chrono::milliseconds(250));
     }
 }
