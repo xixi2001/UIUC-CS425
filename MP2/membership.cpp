@@ -177,7 +177,8 @@ vector<string> random_choose_send_target(set<string> &previous_sent){
         if(previous_sent.find(entry.first.first) != previous_sent.end()) continue;
         choose_ip_from.push_back(entry.first.first);
     }
-    
+    print_to_log("alive ip: " + alive_ip.size(), false);
+    print_to_log("ip from: " + choose_ip_from.size(), false);
     vector<string> send_target;
     if(alive_ip.size() <= heartbeat_number){
         for(string ip : alive_ip)
@@ -221,6 +222,7 @@ void heartbeat_sender(){
         vector<string> target_ips;
         try{
             target_ips = random_choose_send_target(previous_sent);
+            print_to_log("target: " + target_ips.size(), false);
         }   catch (exception &e) {
             cerr << "ERROR: unexpected error" << e.what() << endl;
         }
