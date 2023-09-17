@@ -325,12 +325,7 @@ void failure_detector(){
                 has_failure = true;
                 continue;
             }
-            if(entry.status == 0){
-                if(current_time_ms - time_stamp_ms >= cleanup_time_ms){
-                    member_status.erase(id);
-                }
-                continue; // fail node should not go back to live
-            }
+            if(entry.status == 0)continue; // skip dead node
             if(suspection_mode) {
                 if(current_time_ms - time_stamp_ms >= suspect_time_ms) {
                     entry.status = 1; // 1 for suspect
@@ -348,6 +343,15 @@ void failure_detector(){
                     has_failure = true;
                 }
             }   
+        }
+        for (auto it = member_status.begin(); it != member_status.end(); /*no increment*/) {
+            if(it->second.status == 0 && 
+                current_time_ms - it->second.time_stamp_ms >= cleanup_time_ms){
+                print_to_log("erase success" + it->first.first, true);
+                it = member_status.erase(it);
+            } else {
+                it++;
+            }
         }
         member_status_lock.unlock();
         if(has_failure)print_membership_list();
