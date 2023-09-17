@@ -36,10 +36,10 @@ void message_receiver() {
         throw runtime_error("Message receiver connect fail!");
     }
     
-    bool reuse_addr = true;
-    if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, (const char*) &reuse_addr, sizeof(reuse_addr))){
-        puts("Failure in UDP setsockopt");
-        throw runtime_error("Failure in UDP setsockopt");
+    int yes = 1;
+    if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes))){
+        puts("Reveive failure in UDP setsockopt");
+        throw runtime_error("Reveive failure in UDP setsockopt");
     }
 
     serveraddr.sin_family = AF_INET;
@@ -54,10 +54,15 @@ void message_receiver() {
     while(true){ 
         // receive_message 
         if(recvfrom(sockfd, (char *) buffer, max_buffer_size, 0, (struct sockaddr *) &clientaddr,
-                reinterpret_cast<socklen_t *>(&clientlen)) < 0) continue;
+                reinterpret_cast<socklen_t *>(&clientlen)) < 0){cout << "yoASOBI!" << endl;
+ continue;}
         string msg(buffer);
+        cout << "Message receivced!" << endl; 
+        cout << buffer << endl;
+        cout << msg << endl;
         switch(msg[0]){
             case 'J':
+                cout << "Receive join request: " + msg.substr(1) << endl;
                 response_join(msg.substr(1));
                 break;
             case 'G':
@@ -308,26 +313,32 @@ void join_group(){
     while(true){
         int sockfd_send;
         struct sockaddr_in servaddr;
-        struct hostent *server;
 
         if ( (sockfd_send = socket(AF_INET, SOCK_DGRAM, 0)) < 0 ) {
             puts("Hearbeat sender connect failed!");
             continue;
         }
-        
-        server = gethostbyname(introducer_ip_address.c_str());
-        if (server == nullptr)
-            puts("Heartbeat sender cannot get host by name!");
 
         memset(&servaddr, 0, sizeof(servaddr));
         
         servaddr.sin_family = AF_INET;
-        servaddr.sin_port = htons(listen_port);
+        servaddr.sin_port = htons(send_port);
+
+        struct hostent *server = gethostbyname(introducer_ip_address.c_str());
+        if (server == nullptr)
+            throw runtime_error("Failure in find target host");
         bcopy((char *) server->h_addr, (char *) &servaddr.sin_addr.s_addr, server->h_length);
+        /*servaddr.sin_addr.s_addr = inet_addr(introducer_ip_address.c_str());
+        if(servaddr.sin_addr.s_addr == -1){
+            struct hostent *server = new struct hostent;
+            server = gethostbyname(introducer_ip_address.c_str());
+            servaddr.sin_addr = *((struct in_addr *)server->h_addr);
+        }*/
         
         int n;
         socklen_t len;
         string msg = "J" + machine_id.first + "#" + to_string(machine_id.second); 
+        // cout << msg << endl;
         if(sendto(sockfd_send, msg.c_str(), msg.size(),
             MSG_CONFIRM, (const struct sockaddr *) &servaddr, 
                 sizeof(servaddr)) < 0){
@@ -351,8 +362,8 @@ void join_group(){
         timeout.tv_sec = 1;
         timeout.tv_usec = 0;
         if (setsockopt(sockfd_recv, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout))){
-            puts("Failure in UDP setsockopt");
-            throw runtime_error("Failure in UDP setsockopt");
+            puts("Reveive failure in UDP setsockopt in join_group()");
+            throw runtime_error("Reveive failure in UDP setsockopt in join_group()");
         }
 
         serveraddr.sin_family = AF_INET;
@@ -436,13 +447,13 @@ void save_current_status_to_log() {
 }
 
 int main(int argc, char *argv[]){
-    if(argc != 2 || argc != 3){
+    if(argc != 2 && argc != 3){
 		puts("FATAL: please assign machine number!");
 		exit(1);
 	}
-    machine_id.first = stoi(argv[1]);
+    machine_id.first = argv[1];
     machine_id.second = cur_time_in_ms();
-    if(machine_id.first == 1){ // introducer 
+    if(machine_id.first == introducer_ip_address){ // introducer 
         load_introducer_from_file();
     } else { // others join the group 
         join_group();
@@ -451,6 +462,8 @@ int main(int argc, char *argv[]){
         suspection_mode = stoi(argv[2]);
     }
     print_current_mode();
+
+    cout << "Start detaching receiver, sender, detector..." << endl; 
     thread receiver(message_receiver);receiver.detach();
     thread sender(heartbeat_sender);sender.detach();
     thread detector(failure_detector);detector.detach();
