@@ -218,7 +218,13 @@ void heartbeat_sender(){
     set<string> previous_sent;
     while(true){
         //(1) randomly select, reminder: use lock
-        vector<string> target_ips = random_choose_send_target(previous_sent);
+        vector<string> target_ips;
+        try{
+            target_ips = random_choose_send_target(previous_sent);
+        }   catch (exception &e) {
+            cerr << "ERROR: unexpected error" << e.what() << endl;
+        }
+        
         // cout << "Finish choosing send target" <<endl;
 
         //(2) update your own member entry
