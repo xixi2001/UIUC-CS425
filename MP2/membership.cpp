@@ -65,6 +65,11 @@ void message_receiver() {
             case 'G':
                 print_to_log("Receive gossip request: " + msg.substr(1, 45), false);
                 combine_member_entry(message_to_member_entry(msg.substr(1)));
+                print_detailed_list(message_to_member_entry(msg.substr(1)));
+                print_to_log("================== Member Status ================== ", false);
+                member_status_lock.lock();
+                print_detailed_list(member_status);
+                member_status_lock.unlock();
                 break;
             default:
                 throw("FATAL: ");

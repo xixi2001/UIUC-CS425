@@ -70,6 +70,15 @@ void print_membership_list(){
     print_to_log(ss.str(), true);
 }
 
+void print_detailed_list(const map<pair<string,int64_t>, MemberEntry> & other){
+    stringstream ss;
+    for(auto &[ip, entry] : other) {
+        ss << ip.first.substr(13, 2) << " " << ip.second << ": " << entry.time_stamp_ms << " " << entry.heart_beat_counter << 
+            " " << entry.status << " " << entry.incarnation_count << endl;
+    }
+    print_to_log(ss.str(), false);
+}
+
 inline void print_current_mode(){
     if(suspection_mode) puts("In Gossip+Suspection Mode");
     else puts("In Gossip Mode");
