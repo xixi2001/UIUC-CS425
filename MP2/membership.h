@@ -48,9 +48,10 @@ inline string node_id_to_string(const pair<string,int64_t> &machine_id) {
     return "(" + machine_id.first +", " + std::to_string(machine_id.second)  + ")";
 }
 
-inline void print_to_log(const string &str){
+inline void print_to_log(const string &str, bool print_out){
     int64_t current_time_ms = cur_time_in_ms(); 
-    cout << "[" << current_time_ms - start_time << "] " << str << endl;
+    if(print_out)
+        cout << "[" << current_time_ms - start_time << "] " << str << endl;
     fout_lock.lock();
     fout << "[" << current_time_ms - start_time << "] " << str << endl;
     fout_lock.unlock();
@@ -66,7 +67,7 @@ void print_membership_list(){
         }
     }
     member_status_lock.unlock();
-    print_to_log(ss.str());
+    print_to_log(ss.str(), true);
 }
 
 inline void print_current_mode(){

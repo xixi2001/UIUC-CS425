@@ -59,11 +59,11 @@ void message_receiver() {
         string msg(buffer);
         switch(msg[0]){
             case 'J':
-                print_to_log("Receive join request: " + msg.substr(1, 45));
+                print_to_log("Receive join request: " + msg.substr(1, 45), false);
                 response_join(msg.substr(1));
                 break;
             case 'G':
-                print_to_log("Receive gossip request: " + msg.substr(1, 45));
+                print_to_log("Receive gossip request: " + msg.substr(1, 45), false);
                 combine_member_entry(message_to_member_entry(msg.substr(1)));
                 break;
             default:
@@ -121,7 +121,7 @@ void combine_member_entry(const map<pair<string,int64_t>, MemberEntry> &other){
         if(!member_status.count(id)){
             member_status[id] = entry;
             if(entry.status != 0){
-                print_to_log(node_id_to_string(id) + " has joined");
+                print_to_log(node_id_to_string(id) + " has joined", true);
                 is_change = 1;
             }
 
@@ -133,7 +133,7 @@ void combine_member_entry(const map<pair<string,int64_t>, MemberEntry> &other){
             }
             if(entry.status == 0) {
                 correspond.status = 0;
-                print_to_log(node_id_to_string(id) + " has failed");
+                print_to_log(node_id_to_string(id) + " has failed", true);
                 is_change = 1;
                 continue;
             }
@@ -205,7 +205,7 @@ vector<string> random_choose_send_target(set<string> &previous_sent){
     member_status_lock.unlock();
     sort(send_target.begin(), send_target.end());
     send_target.resize(unique(send_target.begin(), send_target.end()) - send_target.begin());
-    cout << "Target size: " << send_target.size()<< endl;
+    // cout << "Target size: " << send_target.size()<< endl;
     return send_target;
 }
 
@@ -215,7 +215,7 @@ void heartbeat_sender(){
     while(true){
         //(1) randomly select, reminder: use lock
         vector<string> target_ips = random_choose_send_target(previous_sent);
-        cout << "Finish choosing send target" <<endl;
+        // cout << "Finish choosing send target" <<endl;
 
         //(2) update your own member entry
         int64_t cur_time = cur_time_in_ms();
@@ -223,7 +223,7 @@ void heartbeat_sender(){
         member_status[machine_id].time_stamp_ms = cur_time;
         member_status[machine_id].heart_beat_counter = cur_time;
         member_status_lock.unlock();
-        cout << "[" <<cur_time << "]: Update myself" <<endl;
+        // cout << "[" <<cur_time << "]: Update myself" <<endl;
 
         //(3) open socket and send the message
         string msg = "G" + member_entry_to_message();
@@ -232,7 +232,7 @@ void heartbeat_sender(){
             struct sockaddr_in servaddr;
             struct hostent *server;
 
-            print_to_log("Send gossip to: " + target_ips[i]);
+            print_to_log("Send gossip to: " + target_ips[i], false);
 
             if ( (sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0 ) {
                 puts("Hearbeat sender connect failed!");
@@ -296,7 +296,7 @@ void failure_detector(){
             if(time_stamp_ms == leave_heart_beat) {
                 //node has leave
                 entry.status = 0; // 0 for failure 
-                print_to_log(node_id_to_string(id) + " has left");
+                print_to_log(node_id_to_string(id) + " has left", true);
                 has_failure = true;
                 continue;
             }
@@ -309,17 +309,17 @@ void failure_detector(){
             if(suspection_mode) {
                 if(current_time_ms - time_stamp_ms >= suspect_time_ms) {
                     entry.status = 1; // 1 for suspect
-                    print_to_log("Suspect " + node_id_to_string(id));
+                    print_to_log("Suspect " + node_id_to_string(id), true);
                 }
                 if(current_time_ms - time_stamp_ms >= suspect_time_ms + suspect_timeout_ms) {
                     entry.status = 0; // 0 for failure
-                    print_to_log(node_id_to_string(id) + " has failed");
+                    print_to_log(node_id_to_string(id) + " has failed", true);
                     has_failure = true;
                 }
             } else{
                 if(current_time_ms - time_stamp_ms >= fail_time_ms){
                     entry.status = 0; // 0 for failure
-                    print_to_log(node_id_to_string(id) + " has failed");
+                    print_to_log(node_id_to_string(id) + " has failed", true);
                     has_failure = true;
                 }
             }   
@@ -419,7 +419,7 @@ void response_join(const string &str){
     member_status[{ip, time_stamp}].time_stamp_ms = cur_time_in_ms();
     member_status[{ip, time_stamp}].heart_beat_counter = time_stamp;
     member_status_lock.unlock();
-    print_to_log(node_id_to_string({ip, time_stamp}) + " has joined");
+    print_to_log(node_id_to_string({ip, time_stamp}) + " has joined", true);
     print_membership_list();
 
     int sockfd_send;
@@ -502,7 +502,7 @@ int main(int argc, char *argv[]){
     string input;
     while(cin >> input){
         if(input == "LEAVE") {
-            print_to_log(node_id_to_string(machine_id) + " has left");
+            print_to_log(node_id_to_string(machine_id) + " has left", true);
             return 0;
         } else if(input == "CHANGE") {
             suspection_mode ^= 1;
