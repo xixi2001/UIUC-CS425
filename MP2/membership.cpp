@@ -177,8 +177,8 @@ vector<string> random_choose_send_target(set<string> &previous_sent){
         if(previous_sent.find(entry.first.first) != previous_sent.end()) continue;
         choose_ip_from.push_back(entry.first.first);
     }
-    print_to_log("alive ip: " + alive_ip.size(), false);
-    print_to_log("ip from: " + choose_ip_from.size(), false);
+    print_to_log("alive ip: " + to_string(alive_ip.size()), false);
+    print_to_log("ip from: " + to_string(choose_ip_from.size()), false);
     vector<string> send_target;
     if(alive_ip.size() <= heartbeat_number){
         for(string ip : alive_ip)
@@ -222,7 +222,7 @@ void heartbeat_sender(){
         vector<string> target_ips;
         try{
             target_ips = random_choose_send_target(previous_sent);
-            print_to_log("target: " + target_ips.size(), false);
+            print_to_log("target: " + to_string( target_ips.size() ), false);
         }   catch (exception &e) {
             cerr << "ERROR: unexpected error" << e.what() << endl;
         }
@@ -301,6 +301,7 @@ void failure_detector(){
     // this_thread::sleep_for(chrono::milliseconds(500));
     while(true){
         int64_t current_time_ms = cur_time_in_ms();
+        print_to_log("failure detector begin", false);
         member_status_lock.lock();
 
         //update your own member entry
@@ -353,7 +354,7 @@ void failure_detector(){
             exit(0);
         }
         member_status_lock.unlock();
-
+        print_to_log("failure detector end", false);
         this_thread::sleep_for(chrono::milliseconds(250));
     }
 }
