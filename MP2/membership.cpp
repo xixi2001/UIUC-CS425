@@ -289,8 +289,17 @@ void failure_detector(){
     while(true){
         int64_t current_time_ms = cur_time_in_ms();
         member_status_lock.lock();
+
+        //update your own member entry
+        int64_t cur_time = cur_time_in_ms();
+        member_status_lock.lock();
+        member_status[machine_id].time_stamp_ms = cur_time;
+        member_status[machine_id].heart_beat_counter = cur_time;
+        member_status_lock.unlock();
+
         bool has_failure = false;
         for(auto&[id, entry] : member_status) {
+            if(id == machine_id)continue;
             auto time_stamp_ms = entry.time_stamp_ms;
             if(time_stamp_ms == leave_heart_beat) {
                 //node has leave
@@ -326,6 +335,15 @@ void failure_detector(){
         member_status_lock.unlock();
         if(has_failure)print_membership_list();
         save_current_status_to_log();
+
+        //check self is failed by others
+        member_status_lock.lock();
+        if(member_status[machine_id].status == 0) {
+            print_to_log("Kicked out by others", true);
+            exit(0);
+        }
+        member_status_lock.unlock();
+        
         this_thread::sleep_for(chrono::milliseconds(250));
     }
 }
