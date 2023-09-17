@@ -132,7 +132,7 @@ void combine_member_entry(const map<pair<string,int64_t>, MemberEntry> &other){
             }
             if(entry.status == 0) {
                 correspond.status = 0;
-                print_to_log(node_id_to_string(id) + " has failed", true);
+                print_to_log(node_id_to_string(id) + " has failed by other", true);
                 is_change = 1;
                 continue;
             }
@@ -312,13 +312,13 @@ void failure_detector(){
                 }
                 if(current_time_ms - time_stamp_ms >= suspect_time_ms + suspect_timeout_ms) {
                     entry.status = 0; // 0 for failure
-                    print_to_log(node_id_to_string(id) + " has failed", true);
+                    print_to_log(node_id_to_string(id) + " has failed suspect_timeout ", true);
                     has_failure = true;
                 }
             } else{
                 if(current_time_ms - time_stamp_ms >= fail_time_ms){
                     entry.status = 0; // 0 for failure
-                    print_to_log(node_id_to_string(id) + " has failed", true);
+                    print_to_log(node_id_to_string(id) + " has failed timeout", true);
                     has_failure = true;
                 }
             }   
