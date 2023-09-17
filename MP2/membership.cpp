@@ -16,14 +16,14 @@ const string introducer_ip_address = "fa23-cs425-2401.cs.illinois.edu";
 constexpr double heartbeat_interval_sec = 0.5;
 constexpr int heartbeat_number = 5;
 constexpr int max_buffer_size = 2048;
-constexpr int listen_port = 8818;
-constexpr int send_port = 8815;
+constexpr int port_num = 8815;
 constexpr int fail_time_ms = 3000;
 constexpr int suspect_time_ms = 2000;
 constexpr int suspect_timeout_ms = 2000;
 constexpr int cleanup_time_ms = 15000;
 constexpr int64_t leave_heart_beat = 5e13;
 void message_receiver() {
+    cout << "Receiver starts receiving data..." << endl;
     // open socket
     char buffer[max_buffer_size];
 
@@ -44,7 +44,7 @@ void message_receiver() {
 
     serveraddr.sin_family = AF_INET;
     serveraddr.sin_addr.s_addr = INADDR_ANY;
-    serveraddr.sin_port = htons(send_port);
+    serveraddr.sin_port = htons(port_num);
 
     if (bind(sockfd, (struct sockaddr *) &serveraddr, sizeof(serveraddr)) < 0){
         puts("Message receiver bind UDP fail!");
@@ -54,12 +54,8 @@ void message_receiver() {
     while(true){ 
         // receive_message 
         if(recvfrom(sockfd, (char *) buffer, max_buffer_size, 0, (struct sockaddr *) &clientaddr,
-                reinterpret_cast<socklen_t *>(&clientlen)) < 0){cout << "yoASOBI!" << endl;
- continue;}
+                reinterpret_cast<socklen_t *>(&clientlen)) < 0) continue;
         string msg(buffer);
-        cout << "Message receivced!" << endl; 
-        cout << buffer << endl;
-        cout << msg << endl;
         switch(msg[0]){
             case 'J':
                 cout << "Receive join request: " + msg.substr(1) << endl;
@@ -222,7 +218,7 @@ void heartbeat_sender(){
             memset(&servaddr, 0, sizeof(servaddr));
             
             servaddr.sin_family = AF_INET;
-            servaddr.sin_port = htons(listen_port);
+            servaddr.sin_port = htons(port_num);
             bcopy((char *) server->h_addr, (char *) &servaddr.sin_addr.s_addr, server->h_length);
             
             int n;
@@ -322,7 +318,7 @@ void join_group(){
         memset(&servaddr, 0, sizeof(servaddr));
         
         servaddr.sin_family = AF_INET;
-        servaddr.sin_port = htons(send_port);
+        servaddr.sin_port = htons(port_num);
 
         struct hostent *server = gethostbyname(introducer_ip_address.c_str());
         if (server == nullptr)
@@ -359,7 +355,7 @@ void join_group(){
         }
         
         struct timeval timeout;
-        timeout.tv_sec = 1;
+        timeout.tv_sec = 3;
         timeout.tv_usec = 0;
         if (setsockopt(sockfd_recv, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout))){
             puts("Reveive failure in UDP setsockopt in join_group()");
@@ -368,7 +364,7 @@ void join_group(){
 
         serveraddr.sin_family = AF_INET;
         serveraddr.sin_addr.s_addr = INADDR_ANY;
-        serveraddr.sin_port = htons(send_port);
+        serveraddr.sin_port = htons(port_num);
 
         // probably has problem (bind might not needed)
         if (bind(sockfd_recv, (struct sockaddr *) &serveraddr, sizeof(serveraddr)) < 0){
@@ -389,7 +385,7 @@ void join_group(){
     }
 }
 void response_join(const string &str){
-    int idx = 1;
+    int idx = 0;
     string ip = ParseStringUntil(idx, str, '#');
 
     int sockfd_send;
@@ -408,7 +404,7 @@ void response_join(const string &str){
     memset(&servaddr, 0, sizeof(servaddr));
     
     servaddr.sin_family = AF_INET;
-    servaddr.sin_port = htons(listen_port);
+    servaddr.sin_port = htons(port_num);
     bcopy((char *) server->h_addr, (char *) &servaddr.sin_addr.s_addr, server->h_length);
     
     int n;
