@@ -1,5 +1,6 @@
 #include <thread>
 #include <set>
+#include <chrono>
 #include <sys/socket.h> 
 #include <netdb.h>
 #include <netinet/in.h> 
@@ -13,7 +14,6 @@
 #include "membership.h"
 using namespace std;
 const string introducer_ip_address = "fa23-cs425-2401.cs.illinois.edu";
-constexpr double heartbeat_interval_sec = 0.5;
 constexpr int heartbeat_number = 5;
 constexpr int max_buffer_size = 2048;
 constexpr int port_num = 8815;
@@ -23,6 +23,7 @@ constexpr int suspect_timeout_ms = 2000;
 constexpr int cleanup_time_ms = 15000;
 constexpr int64_t leave_heart_beat = 5e13;
 void message_receiver() {
+    // this_thread::sleep_for(chrono::milliseconds(500));
     cout << "Receiver starts receiving data..." << endl;
     // open socket
     char buffer[max_buffer_size];
@@ -204,6 +205,7 @@ vector<string> random_choose_send_target(set<string> &previous_sent){
     member_status_lock.unlock();
     sort(send_target.begin(), send_target.end());
     send_target.resize(unique(send_target.begin(), send_target.end()) - send_target.begin());
+    cout << "Target size: " << send_target.size()<< endl;
     return send_target;
 }
 
@@ -213,6 +215,7 @@ void heartbeat_sender(){
     while(true){
         //(1) randomly select, reminder: use lock
         vector<string> target_ips = random_choose_send_target(previous_sent);
+        cout << "Finish choosing send target" <<endl;
 
         //(2) update your own member entry
         int64_t cur_time = cur_time_in_ms();
@@ -220,6 +223,7 @@ void heartbeat_sender(){
         member_status[machine_id].time_stamp_ms = cur_time;
         member_status[machine_id].heart_beat_counter = cur_time;
         member_status_lock.unlock();
+        cout << "[" <<cur_time << "]: Update myself" <<endl;
 
         //(3) open socket and send the message
         string msg = "G" + member_entry_to_message();
@@ -256,7 +260,7 @@ void heartbeat_sender(){
         
             close(sockfd);
         }
-        sleep(heartbeat_interval_sec);
+        this_thread::sleep_for(chrono::milliseconds(500));
     }
 }
 
@@ -282,6 +286,7 @@ string member_entry_to_message(){
 }
 
 void failure_detector(){
+    // this_thread::sleep_for(chrono::milliseconds(500));
     while(true){
         int64_t current_time_ms = cur_time_in_ms();
         member_status_lock.lock();
@@ -322,7 +327,7 @@ void failure_detector(){
         member_status_lock.unlock();
         if(has_failure)print_membership_list();
         save_current_status_to_log();
-        sleep(0.5);
+        this_thread::sleep_for(chrono::milliseconds(250));
     }
 }
 
@@ -401,7 +406,7 @@ void join_group(){
         else{
             close(sockfd_recv);
             puts("Join timeout. Reconnect again...");
-            sleep(0.5);
+            this_thread::sleep_for(chrono::milliseconds(500));
         }
     }
 }
