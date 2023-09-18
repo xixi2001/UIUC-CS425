@@ -198,7 +198,7 @@ vector<string> random_choose_send_target(set<string> &previous_sent){
         int required = heartbeat_number - (int)send_target.size();
         for(int i = 0; i < required; i++){
             send_target.push_back(alive_ip[i]);
-            previous_sent.insert(choose_ip_from[i]);
+            previous_sent.insert(alive_ip[i]);
         }
     }
     else if(choose_ip_from.size() > heartbeat_number){
