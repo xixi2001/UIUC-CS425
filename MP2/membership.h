@@ -51,9 +51,9 @@ inline void print_to_log(const string &str, bool print_out){
     int64_t current_time_ms = cur_time_in_ms(); 
     if(print_out)
         cout << "[" << current_time_ms - machine_id.second << "] " << str << endl;
-    // fout_lock.lock();
-    // fout << "[" << current_time_ms - machine_id.second << "] " << str << endl;
-    // fout_lock.unlock();
+    fout_lock.lock();
+    fout << "[" << current_time_ms - machine_id.second << "] " << str << endl;
+    fout_lock.unlock();
 }
 
 void print_membership_list(){
