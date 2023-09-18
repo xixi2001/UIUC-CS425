@@ -122,7 +122,7 @@ void combine_member_entry(const map<pair<string,int64_t>, MemberEntry> &other){
     member_status_lock.lock();
     bool is_change = 0;
     for(const auto &[id, entry] : other){
-        if(!member_status.count(id) && entry.status != 0){
+        if(!member_status.count(id) && entry.s){
             member_status[id] = entry;
             if(entry.status != 0){
                 print_to_log(node_id_to_string(id) + " has joined", true);
@@ -136,9 +136,11 @@ void combine_member_entry(const map<pair<string,int64_t>, MemberEntry> &other){
                 continue;
             }
             if(entry.status == 0) {
-                correspond.status = 0;
-                print_to_log(node_id_to_string(id) + " has failed by other", true);
-                is_change = 1;
+                if(correspond.status != 0){
+                    correspond.status = 0;
+                    print_to_log(node_id_to_string(id) + " has failed by other", true);
+                    is_change = 1;                    
+                }
                 continue;
             }
             // heartbeat
@@ -198,7 +200,7 @@ vector<string> random_choose_send_target(set<string> &previous_sent){
         int required = heartbeat_number - (int)send_target.size();
         for(int i = 0; i < required; i++){
             send_target.push_back(alive_ip[i]);
-            previous_sent.insert(alive_ip[i]);
+            previous_sent.insert(choose_ip_from[i]);
         }
     }
     else if(choose_ip_from.size() > heartbeat_number){
