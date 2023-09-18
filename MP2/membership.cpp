@@ -289,9 +289,17 @@ string member_entry_to_message(){
     res << '#';
     res << machine_id.second;
     res << '#';
+    int cnt = 0;
+    for(auto id_entry:member_status) {
+        if(cur_time_in_ms() - id_entry.second.time_stamp_ms <= cleanup_time_ms){
+            cnt++;
+        }
+    }
     res << member_status.size();
     res << '#';
     for(auto id_entry:member_status) {
+        if(cur_time_in_ms() - id_entry.second.time_stamp_ms > cleanup_time_ms)
+            continue;
         res<<id_entry.first.first << '#';
         res<<id_entry.first.second << '#';
         res<<id_entry.second.time_stamp_ms << "#";
@@ -347,15 +355,15 @@ void failure_detector(){
                 }
             }   
         }
-        for (auto it = member_status.begin(); it != member_status.end(); /*no increment*/) {
-            if(it->second.status == 0 && 
-                current_time_ms - it->second.time_stamp_ms >= cleanup_time_ms){
-                print_to_log("erase success" + it->first.first, true);
-                it = member_status.erase(it);
-            } else {
-                it++;
-            }
-        }
+        // for (auto it = member_status.begin(); it != member_status.end(); /*no increment*/) {
+        //     if(it->second.status == 0 && 
+        //         current_time_ms - it->second.time_stamp_ms >= cleanup_time_ms){
+        //         print_to_log("erase success" + it->first.first, true);
+        //         it = member_status.erase(it);
+        //     } else {
+        //         it++;
+        //     }
+        // }
         member_status_lock.unlock();
         if(has_failure)print_membership_list();
         save_current_status_to_log();
@@ -524,7 +532,6 @@ int main(int argc, char *argv[]){
     machine_id.first = argv[1];
     machine_id.second = cur_time_in_ms();
     fout.open(node_id_to_string(machine_id) + ".log");
-    start_time = cur_time_in_ms();
     if(machine_id.first == introducer_ip_address){ // introducer 
         load_introducer_from_file();
     } else { // others join the group 

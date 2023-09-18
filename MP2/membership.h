@@ -37,7 +37,6 @@ bool suspection_mode = 0;// only one writter, no mutex needed
 
 mutex fout_lock;
 ofstream fout;
-int64_t start_time; // only write in main no mutex needed
 
 int64_t cur_time_in_ms(){
     return (int64_t) chrono::duration_cast<chrono::milliseconds>(
@@ -51,9 +50,9 @@ inline string node_id_to_string(const pair<string,int64_t> &machine_id) {
 inline void print_to_log(const string &str, bool print_out){
     int64_t current_time_ms = cur_time_in_ms(); 
     if(print_out)
-        cout << "[" << current_time_ms - start_time << "] " << str << endl;
+        cout << "[" << current_time_ms - machine_id.second << "] " << str << endl;
     fout_lock.lock();
-    fout << "[" << current_time_ms - start_time << "] " << str << endl;
+    fout << "[" << current_time_ms - machine_id.second << "] " << str << endl;
     fout_lock.unlock();
 }
 
