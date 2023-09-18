@@ -195,7 +195,8 @@ vector<string> random_choose_send_target(set<string> &previous_sent){
         for(string ip: choose_ip_from)
             send_target.push_back(ip);
         random_shuffle(alive_ip.begin(), alive_ip.end());
-        for(int i = 0; i < heartbeat_number - send_target.size(); i++){
+        int required = heartbeat_number - (int)send_target.size();
+        for(int i = 0; i < required; i++){
             send_target.push_back(alive_ip[i]);
             previous_sent.insert(choose_ip_from[i]);
         }
