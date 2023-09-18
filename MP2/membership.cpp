@@ -74,6 +74,7 @@ void message_receiver() {
             default:
                 throw("FATAL: ");
         }
+        print_to_log("Ready to read next message!", false);
 
     }
     close(sockfd);
@@ -272,7 +273,8 @@ void heartbeat_sender(){
                         cout << "Heartbeat sender fail to send message to "  <<  ip << endl;
             }
         
-            close(sockfd);            
+            close(sockfd);
+            print_to_log("sent to " + ip + " success!" , false); 
         };
         for(int i = 0; i < target_ips.size(); i++){
            thread(send_a_message, target_ips[i], msg).detach();
