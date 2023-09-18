@@ -241,7 +241,7 @@ void heartbeat_sender(){
 
         //(3) open socket and send the message
         string msg = "G" + member_entry_to_message();
-        auto send_a_message = [&msg](string ip) {
+        auto send_a_message = [](string ip, string msg) {
             int sockfd;
             struct sockaddr_in servaddr;
             struct hostent *server;
@@ -275,7 +275,7 @@ void heartbeat_sender(){
             close(sockfd);            
         };
         for(int i = 0; i < target_ips.size(); i++){
-           thread(send_a_message, target_ips[i]).detach();
+           thread(send_a_message, target_ips[i], msg).detach();
         }
         // this_thread::sleep_for(chrono::milliseconds(500));
     }
