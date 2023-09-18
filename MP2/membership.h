@@ -72,7 +72,7 @@ void print_membership_list(){
 void print_detailed_list(const map<pair<string,int64_t>, MemberEntry> & other){
     stringstream ss;
     for(auto &[ip, entry] : other) {
-        ss << ip.first.substr(13, 2) << " " << ip.second << ": " << entry.time_stamp_ms << " " << entry.heart_beat_counter << 
+        ss << ip.first << " " << ip.second << ": " << entry.time_stamp_ms << " " << entry.heart_beat_counter << 
             " " << entry.status << " " << entry.incarnation_count << endl;
     }
     print_to_log(ss.str(), false);

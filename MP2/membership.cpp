@@ -13,7 +13,7 @@
 #include <cassert>
 #include "membership.h"
 using namespace std;
-const string introducer_ip_address = "fa23-cs425-2401.cs.illinois.edu";
+const string introducer_ip_address = "172.22.94.78";
 constexpr int heartbeat_number = 5;
 constexpr int max_buffer_size = 2048;
 constexpr int port_num = 8815;
@@ -22,6 +22,27 @@ constexpr int suspect_time_ms = 2000;
 constexpr int suspect_timeout_ms = 2000;
 constexpr int cleanup_time_ms = 15000;
 constexpr int64_t leave_heart_beat = 5e13;
+
+int64_t ParseIntUntil(int &idx,const string& str, char c){
+    int64_t res = 0;
+    while(idx < str.length() && str[idx] != c) {
+        assert(str[idx] >= '0' && str[idx] <= '9');
+        res = res * 10 + str[idx] - '0';
+        idx++;
+    }
+    idx++;
+    return res;
+}
+string ParseStringUntil(int &idx,const string& str, char c){
+    string res;
+    while(idx < str.length() && str[idx] != c) {
+        res += str[idx];
+        idx++;
+    }
+    idx++;
+    return res;   
+}
+
 void message_receiver() {
     // this_thread::sleep_for(chrono::milliseconds(500));
     cout << "Receiver starts receiving data..." << endl;
@@ -53,17 +74,21 @@ void message_receiver() {
     }
 
     while(true){ 
-        // receive_message 
+        // receive_message
+        memset(buffer, 0, sizeof(buffer));
         if(recvfrom(sockfd, (char *) buffer, max_buffer_size, 0, (struct sockaddr *) &clientaddr,
                 reinterpret_cast<socklen_t *>(&clientlen)) < 0) continue;
         string msg(buffer);
+        int idx = 1;
+        string ip = ParseStringUntil(idx, msg, '#');
+        print_to_log("receive: " + msg, false);
         switch(msg[0]){
             case 'J':
-                print_to_log("Receive join request: " + msg.substr(1, 45), false);
+                print_to_log("Receive join request: " + ip, false);
                 response_join(msg.substr(1));
                 break;
             case 'G':
-                print_to_log("Receive gossip request: " + msg.substr(1, 45), false);
+                print_to_log("Receive gossip request: " + ip, false);
                 combine_member_entry(message_to_member_entry(msg.substr(1)));
                 print_detailed_list(message_to_member_entry(msg.substr(1)));
                 print_to_log("================== Member Status ================== ", false);
@@ -78,25 +103,6 @@ void message_receiver() {
 
     }
     close(sockfd);
-}
-int64_t ParseIntUntil(int &idx,const string& str, char c){
-    int64_t res = 0;
-    while(idx < str.length() && str[idx] != c) {
-        assert(str[idx] >= '0' && str[idx] <= '9');
-        res = res * 10 + str[idx] - '0';
-        idx++;
-    }
-    idx++;
-    return res;
-}
-string ParseStringUntil(int &idx,const string& str, char c){
-    string res;
-    while(idx < str.length() && str[idx] != c) {
-        res += str[idx];
-        idx++;
-    }
-    idx++;
-    return res;   
 }
 
 map<pair<string,int64_t>, MemberEntry> message_to_member_entry(const string &str){
@@ -214,7 +220,6 @@ vector<string> random_choose_send_target(set<string> &previous_sent){
     member_status_lock.unlock();
     sort(send_target.begin(), send_target.end());
     send_target.resize(unique(send_target.begin(), send_target.end()) - send_target.begin());
-    // cout << "Target size: " << send_target.size()<< endl;
     return send_target;
 }
 
@@ -248,33 +253,31 @@ void heartbeat_sender(){
             struct hostent *server;
 
             print_to_log("Send gossip to: " + ip, false);
+            print_to_log(msg, false);
 
             if ( (sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0 ) {
                 puts("Hearbeat sender connect failed!");
                 return;
             }
-            
-            server = gethostbyname(ip.c_str());
-            if (server == nullptr)
-                puts("Heartbeat sender cannot get host by name!");
 
             memset(&servaddr, 0, sizeof(servaddr));
             
             servaddr.sin_family = AF_INET;
             servaddr.sin_port = htons(port_num);
-            bcopy((char *) server->h_addr, (char *) &servaddr.sin_addr.s_addr, server->h_length);
+            servaddr.sin_addr.s_addr = inet_addr(ip.c_str());
             
             int n;
             socklen_t len;
-            
-            if(sendto(sockfd, msg.c_str(), msg.size(),
-                MSG_CONFIRM, (const struct sockaddr *) &servaddr, 
-                    sizeof(servaddr)) < 0){
+
+            print_to_log("start to sent to" + ip, false);
+            int res = sendto(sockfd, msg.c_str(), msg.size(),
+                        MSG_CONFIRM, (const struct sockaddr *) &servaddr, 
+                            sizeof(servaddr));
+            if(res < 0){
                         cout << "Heartbeat sender fail to send message to "  <<  ip << endl;
             }
-        
             close(sockfd);
-            print_to_log("sent to " + ip + " success!" , false); 
+            print_to_log("sent to " + ip + " success! code: " + to_string(res) , false); 
         };
         for(int i = 0; i < target_ips.size(); i++){
            thread(send_a_message, target_ips[i], msg).detach();
@@ -296,7 +299,7 @@ string member_entry_to_message(){
             cnt++;
         }
     }
-    res << member_status.size();
+    res << cnt;
     res << '#';
     for(auto id_entry:member_status) {
         if(cur_time_in_ms() - id_entry.second.time_stamp_ms > cleanup_time_ms)
@@ -356,15 +359,6 @@ void failure_detector(){
                 }
             }   
         }
-        // for (auto it = member_status.begin(); it != member_status.end(); /*no increment*/) {
-        //     if(it->second.status == 0 && 
-        //         current_time_ms - it->second.time_stamp_ms >= cleanup_time_ms){
-        //         print_to_log("erase success" + it->first.first, true);
-        //         it = member_status.erase(it);
-        //     } else {
-        //         it++;
-        //     }
-        // }
         member_status_lock.unlock();
         if(has_failure)print_membership_list();
         save_current_status_to_log();
@@ -396,21 +390,13 @@ void join_group(){
         servaddr.sin_family = AF_INET;
         servaddr.sin_port = htons(port_num);
 
-        struct hostent *server = gethostbyname(introducer_ip_address.c_str());
-        if (server == nullptr)
-            throw runtime_error("Failure in find target host");
-        bcopy((char *) server->h_addr, (char *) &servaddr.sin_addr.s_addr, server->h_length);
-        /*servaddr.sin_addr.s_addr = inet_addr(introducer_ip_address.c_str());
-        if(servaddr.sin_addr.s_addr == -1){
-            struct hostent *server = new struct hostent;
-            server = gethostbyname(introducer_ip_address.c_str());
-            servaddr.sin_addr = *((struct in_addr *)server->h_addr);
-        }*/
+        servaddr.sin_addr.s_addr = inet_addr(introducer_ip_address.c_str());
+
         
         int n;
         socklen_t len;
         string msg = "J" + machine_id.first + "#" + to_string(machine_id.second); 
-        // cout << msg << endl;
+        print_to_log("send join request: " + msg, false);
         if(sendto(sockfd_send, msg.c_str(), msg.size(),
             MSG_CONFIRM, (const struct sockaddr *) &servaddr, 
                 sizeof(servaddr)) < 0){
@@ -461,6 +447,7 @@ void join_group(){
     }
 }
 void response_join(const string &str){
+    print_to_log("reponse: " + str, false);
     int idx = 0;
     string ip = ParseStringUntil(idx, str, '#');
     int64_t time_stamp = ParseIntUntil(idx, str, '#');
@@ -481,15 +468,17 @@ void response_join(const string &str){
         return;
     }
     
-    server = gethostbyname(ip.c_str());
-    if (server == nullptr)
-        puts("Heartbeat sender cannot get host by name!");
+    // server = gethostbyname(ip.c_str());
+    // cout << server << endl;
+    // if (server == nullptr)
+    //     puts("Heartbeat sender cannot get host by name!");
 
     memset(&servaddr, 0, sizeof(servaddr));
     
     servaddr.sin_family = AF_INET;
     servaddr.sin_port = htons(port_num);
-    bcopy((char *) server->h_addr, (char *) &servaddr.sin_addr.s_addr, server->h_length);
+    // bcopy((char *) server->h_addr, (char *) &servaddr.sin_addr.s_addr, server->h_length);
+    servaddr.sin_addr.s_addr = inet_addr(ip.c_str());
     
     int n;
     socklen_t len;
