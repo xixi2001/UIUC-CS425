@@ -226,12 +226,8 @@ void heartbeat_sender(){
         last_update_time = cur_time_in_ms();
         //(1) randomly select, reminder: use lock
         vector<string> target_ips;
-        try{
-            target_ips = random_choose_send_target(previous_sent);
-            print_to_log("target: " + to_string( target_ips.size() ), false);
-        }   catch (exception &e) {
-            cerr << "ERROR: unexpected error" << e.what() << endl;
-        }
+        target_ips = random_choose_send_target(previous_sent);
+        print_to_log("target: " + to_string( target_ips.size() ), false);
         
         // cout << "Finish choosing send target" <<endl;
 
