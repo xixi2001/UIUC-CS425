@@ -122,7 +122,7 @@ void combine_member_entry(const map<pair<string,int64_t>, MemberEntry> &other){
     member_status_lock.lock();
     bool is_change = 0;
     for(const auto &[id, entry] : other){
-        if(!member_status.count(id)){
+        if(!member_status.count(id) && entry.status != 0){
             member_status[id] = entry;
             if(entry.status != 0){
                 print_to_log(node_id_to_string(id) + " has joined", true);
