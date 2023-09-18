@@ -81,6 +81,7 @@ void message_receiver() {
         string msg(buffer);
         int idx = 1;
         string ip = ParseStringUntil(idx, msg, '#');
+        int64_t time_stamp = 0;
         print_to_log("receive: " + msg, false);
         switch(msg[0]){
             case 'J':
@@ -94,6 +95,12 @@ void message_receiver() {
                 print_to_log("================== Member Status ================== ", false);
                 member_status_lock.lock();
                 print_detailed_list(member_status);
+                member_status_lock.unlock();
+                break;
+            case 'L':
+                time_stamp = ParseIntUntil(idx, msg, '#');
+                member_status_lock.lock();
+                member_status[{ip, time_stamp}].heart_beat_counter = leave_heart_beat;
                 member_status_lock.unlock();
                 break;
             default:
@@ -132,7 +139,8 @@ void combine_member_entry(const map<pair<string,int64_t>, MemberEntry> &other){
         if(!member_status.count(id) && entry.status != 0){
             member_status[id] = entry;
             if(entry.status != 0){
-                print_to_log(node_id_to_string(id) + " has joined", true);
+                print_to_log(node_id_to_string(id) + " " + ip_to_machine[id.first] + 
+                                " has joined", true);
                 is_change = 1;
             }
 
@@ -145,7 +153,8 @@ void combine_member_entry(const map<pair<string,int64_t>, MemberEntry> &other){
             if(entry.status == 0) {
                 if(correspond.status != 0){
                     correspond.status = 0;
-                    print_to_log(node_id_to_string(id) + " has failed by other", true);
+                    print_to_log(node_id_to_string(id) + " " + ip_to_machine[id.first] + 
+                                    " has failed by other", true);
                     is_change = 1;                    
                 }
                 continue;
@@ -223,6 +232,38 @@ vector<string> random_choose_send_target(set<string> &previous_sent){
     return send_target;
 }
 
+void send_a_udp_message(string ip, string msg) {
+    int sockfd;
+    struct sockaddr_in servaddr;
+    struct hostent *server;
+
+    print_to_log("Send gossip to: " + ip, false);
+    print_to_log(msg, false);
+
+    if ( (sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0 ) {
+        puts("Hearbeat sender create socket fail failed!");
+        return;
+    }
+
+    memset(&servaddr, 0, sizeof(servaddr));
+    
+    servaddr.sin_family = AF_INET;
+    servaddr.sin_port = htons(port_num);
+    servaddr.sin_addr.s_addr = inet_addr(ip.c_str());
+    
+    int n;
+    socklen_t len;
+
+    print_to_log("start to sent to" + ip, false);
+    if(sendto(sockfd, msg.c_str(), msg.size(),
+                MSG_CONFIRM, (const struct sockaddr *) &servaddr, 
+                    sizeof(servaddr)) < 0){
+        cout << "Heartbeat sender fail to send message to "  <<  ip << endl;
+    }
+    close(sockfd);
+    print_to_log("sent to " + ip + " success!" , false); 
+}
+
 void heartbeat_sender(){
     // assume there is only one server on a single ip address
     set<string> previous_sent;
@@ -247,40 +288,8 @@ void heartbeat_sender(){
 
         //(3) open socket and send the message
         string msg = "G" + member_entry_to_message();
-        auto send_a_message = [](string ip, string msg) {
-            int sockfd;
-            struct sockaddr_in servaddr;
-            struct hostent *server;
-
-            print_to_log("Send gossip to: " + ip, false);
-            print_to_log(msg, false);
-
-            if ( (sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0 ) {
-                puts("Hearbeat sender connect failed!");
-                return;
-            }
-
-            memset(&servaddr, 0, sizeof(servaddr));
-            
-            servaddr.sin_family = AF_INET;
-            servaddr.sin_port = htons(port_num);
-            servaddr.sin_addr.s_addr = inet_addr(ip.c_str());
-            
-            int n;
-            socklen_t len;
-
-            print_to_log("start to sent to" + ip, false);
-            int res = sendto(sockfd, msg.c_str(), msg.size(),
-                        MSG_CONFIRM, (const struct sockaddr *) &servaddr, 
-                            sizeof(servaddr));
-            if(res < 0){
-                        cout << "Heartbeat sender fail to send message to "  <<  ip << endl;
-            }
-            close(sockfd);
-            print_to_log("sent to " + ip + " success! code: " + to_string(res) , false); 
-        };
         for(int i = 0; i < target_ips.size(); i++){
-           thread(send_a_message, target_ips[i], msg).detach();
+           thread(send_a_udp_message, target_ips[i], msg).detach();
         }
         // this_thread::sleep_for(chrono::milliseconds(500));
     }
@@ -333,28 +342,32 @@ void failure_detector(){
         for(auto&[id, entry] : member_status) {
             if(id == machine_id)continue;
             auto time_stamp_ms = entry.time_stamp_ms;
-            if(time_stamp_ms == leave_heart_beat) {
+            if(entry.status == 0)continue; // skip dead node
+            if(entry.heart_beat_counter == leave_heart_beat) {
                 //node has leave
                 entry.status = 0; // 0 for failure 
-                print_to_log(node_id_to_string(id) + " has left", true);
+                print_to_log(node_id_to_string(id) + " " + ip_to_machine[id.first] + 
+                                " has left", true);
                 has_failure = true;
                 continue;
             }
-            if(entry.status == 0)continue; // skip dead node
             if(suspection_mode) {
                 if(current_time_ms - time_stamp_ms >= suspect_time_ms) {
                     entry.status = 1; // 1 for suspect
-                    print_to_log("Suspect " + node_id_to_string(id), true);
+                    print_to_log("Suspect " + node_id_to_string(id) + 
+                                    " " + ip_to_machine[id.first], true);
                 }
                 if(current_time_ms - time_stamp_ms >= suspect_time_ms + suspect_timeout_ms) {
                     entry.status = 0; // 0 for failure
-                    print_to_log(node_id_to_string(id) + " has failed suspect_timeout ", true);
+                    print_to_log(node_id_to_string(id) + " " + ip_to_machine[id.first] + 
+                                    " has failed suspect_timeout ", true);
                     has_failure = true;
                 }
             } else{
                 if(current_time_ms - time_stamp_ms >= fail_time_ms){
                     entry.status = 0; // 0 for failure
-                    print_to_log(node_id_to_string(id) + " has failed timeout", true);
+                    print_to_log(node_id_to_string(id) + " " + ip_to_machine[id.first] + 
+                                    " has failed timeout", true);
                     has_failure = true;
                 }
             }   
@@ -446,6 +459,7 @@ void join_group(){
         }
     }
 }
+
 void response_join(const string &str){
     print_to_log("reponse: " + str, false);
     int idx = 0;
@@ -490,6 +504,25 @@ void response_join(const string &str){
     }
 
     close(sockfd_send);
+}
+
+void leave_group(){
+    vector<string> target_ips;
+
+    member_status_lock.lock();
+    for (auto entry : member_status){
+        if(entry.second.status == 0) continue;
+        if(entry.first.first == machine_id.first) continue;
+        target_ips.push_back(entry.first.first);
+    }
+    member_status_lock.unlock();
+
+    //(3) open socket and send the message
+    string msg = "L" + machine_id.first + "#" + to_string(machine_id.second) + "#"; 
+    for(int i = 0; i < target_ips.size(); i++){
+        send_a_udp_message(target_ips[i], msg);
+    } 
+    
 }
 
 void load_introducer_from_file() {
@@ -539,10 +572,11 @@ int main(int argc, char *argv[]){
 
     string input;
     while(cin >> input){
-        if(input == "LEAVE") {
+        if(input == "LEAVE" || input == "L") {
+            leave_group();
             print_to_log(node_id_to_string(machine_id) + " has left", true);
             return 0;
-        } else if(input == "CHANGE") {
+        } else if(input == "CHANGE" || input == "C") {
             suspection_mode ^= 1;
             print_current_mode();
         } else {
