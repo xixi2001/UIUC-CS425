@@ -241,19 +241,19 @@ void heartbeat_sender(){
 
         //(3) open socket and send the message
         string msg = "G" + member_entry_to_message();
-        for(int i = 0; i < target_ips.size(); i++){
+        auto send_a_message = [&message](string ip) {
             int sockfd;
             struct sockaddr_in servaddr;
             struct hostent *server;
 
-            print_to_log("Send gossip to: " + target_ips[i], false);
+            print_to_log("Send gossip to: " + ip, false);
 
             if ( (sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0 ) {
                 puts("Hearbeat sender connect failed!");
                 continue;
             }
             
-            server = gethostbyname(target_ips[i].c_str());
+            server = gethostbyname(ip.c_str());
             if (server == nullptr)
                 puts("Heartbeat sender cannot get host by name!");
 
@@ -272,7 +272,10 @@ void heartbeat_sender(){
                         cout << "Heartbeat sender fail to send message to " + target_ips[i] << endl;
             }
         
-            close(sockfd);
+            close(sockfd);            
+        }
+        for(int i = 0; i < target_ips.size(); i++){
+           thread(send_a_message, target_ips[i]).detach();
         }
         // this_thread::sleep_for(chrono::milliseconds(500));
     }
