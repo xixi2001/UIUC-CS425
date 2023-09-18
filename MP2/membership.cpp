@@ -241,7 +241,7 @@ void heartbeat_sender(){
 
         //(3) open socket and send the message
         string msg = "G" + member_entry_to_message();
-        auto send_a_message = [&message](string ip) {
+        auto send_a_message = [&msg](string ip) {
             int sockfd;
             struct sockaddr_in servaddr;
             struct hostent *server;
@@ -250,7 +250,7 @@ void heartbeat_sender(){
 
             if ( (sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0 ) {
                 puts("Hearbeat sender connect failed!");
-                continue;
+                return;
             }
             
             server = gethostbyname(ip.c_str());
@@ -269,11 +269,11 @@ void heartbeat_sender(){
             if(sendto(sockfd, msg.c_str(), msg.size(),
                 MSG_CONFIRM, (const struct sockaddr *) &servaddr, 
                     sizeof(servaddr)) < 0){
-                        cout << "Heartbeat sender fail to send message to " + target_ips[i] << endl;
+                        cout << "Heartbeat sender fail to send message to "  <<  ip << endl;
             }
         
             close(sockfd);            
-        }
+        };
         for(int i = 0; i < target_ips.size(); i++){
            thread(send_a_message, target_ips[i]).detach();
         }
