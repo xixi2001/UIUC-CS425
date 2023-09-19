@@ -526,18 +526,28 @@ void leave_group(){
 }
 
 void load_introducer_from_file() {
-    string log_file_name = machine_id.first + to_string(machine_id.second);
-    ifstream fin( log_file_name + ".log");
+    ifstream fin(machine_id.first + ".log");
     string str;fin>>str;
     auto res = message_to_member_entry(str);
+    auto cur_time_ms = cur_time_in_ms();
     member_status_lock.lock();
     member_status = res;
-    if(!member_status.count(machine_id)) {
-        member_status.emplace(machine_id, cur_time_in_ms());
+    pair<string,int64_t> previous_same_machine_id;
+    for (auto& [id, entry] : member_status) {
+        cout << id.first << " " << id.second << endl;
+        if(id.first == machine_id.first) {
+            previous_same_machine_id = id;
+        }
+        // update all of the alived node to current timestamp
+        if(entry.status > 0) {
+            entry.time_stamp_ms = cur_time_ms;
+        }
     }
-    member_status[machine_id].time_stamp_ms = cur_time_in_ms();
-    member_status[machine_id].heart_beat_counter = cur_time_in_ms();
+    // insert new self and erase previous self
+    member_status.emplace(machine_id, cur_time_in_ms());
+    member_status.erase(previous_same_machine_id);
     member_status_lock.unlock();
+    print_membership_list();
     fin.close();
 }
 

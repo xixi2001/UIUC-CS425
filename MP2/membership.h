@@ -69,7 +69,7 @@ void init_ip_list(){
     ip_to_machine["172.22.94.81"] = "10";
 }
 bool print_cmp(pair <pair<string,int64_t>, MemberEntry > A, pair <pair<string,int64_t>, MemberEntry > B) {
-    return A.first < B.first;
+    return stoi(A.first.first) < stoi(B.first.first);
 }
 void print_membership_list(){
     vector<pair <pair<string,int64_t>, MemberEntry > >tmp; 
@@ -108,7 +108,6 @@ inline void print_current_mode(){
 
 void message_receiver();
 /*
-TODO:
     open socket
     while(true){ 
         (1) receive_message 
@@ -138,7 +137,6 @@ void send_a_udp_message(string ip, string msg);
 
 void heartbeat_sender();
 /*
-TODO:
     while(true){ 
             (1) randomly select, reminder: use lock
             (2) update your own member entry 
@@ -151,7 +149,6 @@ string member_entry_to_message();// reminder: use lock
 
 void failure_detector();
 /*
-TODO:
     while(true){
         check row by row // reminder: use lock
         sleep(heartbeat_interval_sec)
