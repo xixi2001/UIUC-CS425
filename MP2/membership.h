@@ -55,15 +55,29 @@ inline void print_to_log(const string &str, bool print_out){
     fout << "[" << current_time_ms - machine_id.second << "] " << str << endl;
     fout_lock.unlock();
 }
-
+map<string, string> ip_to_machine; // only write in main, no mutex needed 
+void init_ip_list(){
+    ip_to_machine["172.22.94.78"] = "1";
+    ip_to_machine["172.22.156.79"] = "2";
+    ip_to_machine["172.22.158.79"] = "3";
+    ip_to_machine["172.22.94.79"] = "4";
+    ip_to_machine["172.22.156.80"] = "5";
+    ip_to_machine["172.22.158.80"] = "6";
+    ip_to_machine["172.22.94.80"] = "7";
+    ip_to_machine["172.22.156.81"] = "8";
+    ip_to_machine["172.22.158.81"] = "9";
+    ip_to_machine["172.22.94.81"] = "10";
+}
 bool print_cmp(pair <pair<string,int64_t>, MemberEntry > A, pair <pair<string,int64_t>, MemberEntry > B) {
     return A.first < B.first;
 }
-
 void print_membership_list(){
     vector<pair <pair<string,int64_t>, MemberEntry > >tmp; 
     member_status_lock.lock();
-    for(const auto& item : member_status)tmp.push_back(item);
+    for(const auto& [ip, entry] : member_status){
+        pair<string,int64_t> new_id({ip_to_machine[ip.first], ip.second});
+        tmp.push_back({new_id, entry});
+    }
     member_status_lock.unlock();
     sort(tmp.begin(), tmp.end(), print_cmp);
     stringstream ss;
@@ -76,6 +90,7 @@ void print_membership_list(){
     
     print_to_log(ss.str(), true);
 }
+
 
 void print_detailed_list(const map<pair<string,int64_t>, MemberEntry> & other){
     stringstream ss;
@@ -163,18 +178,3 @@ void leave_group();
 void load_introducer_from_file();
 
 void save_current_status_to_log();
-
-map<string, string> ip_to_machine; // only write in main, no mutex needed 
-
-void init_ip_list(){
-    ip_to_machine["172.22.94.78"] = "1";
-    ip_to_machine["172.22.156.79"] = "2";
-    ip_to_machine["172.22.158.79"] = "3";
-    ip_to_machine["172.22.94.79"] = "4";
-    ip_to_machine["172.22.156.80"] = "5";
-    ip_to_machine["172.22.158.80"] = "6";
-    ip_to_machine["172.22.94.80"] = "7";
-    ip_to_machine["172.22.156.81"] = "8";
-    ip_to_machine["172.22.158.81"] = "9";
-    ip_to_machine["172.22.94.81"] = "10";
-}

@@ -352,7 +352,7 @@ void failure_detector(){
                 continue;
             }
             if(suspection_mode) {
-                if(current_time_ms - time_stamp_ms >= suspect_time_ms) {
+                if(current_time_ms - time_stamp_ms >= suspect_time_ms && entry.status == 2) {
                     entry.status = 1; // 1 for suspect
                     print_to_log("Suspect " + node_id_to_string(id) + 
                                     " " + ip_to_machine[id.first], true);
@@ -470,7 +470,7 @@ void response_join(const string &str){
     member_status[{ip, time_stamp}].time_stamp_ms = cur_time_in_ms();
     member_status[{ip, time_stamp}].heart_beat_counter = time_stamp;
     member_status_lock.unlock();
-    print_to_log(node_id_to_string({ip, time_stamp}) + " has joined", true);
+    print_to_log(node_id_to_string({ip, time_stamp}) + " " + ip_to_machine[ip] + " has joined", true);
     print_membership_list();
 
     int sockfd_send;
@@ -548,6 +548,7 @@ void save_current_status_to_log() {
 }
 
 int main(int argc, char *argv[]){
+    init_ip_list();
     if(argc != 2 && argc != 3){
 		puts("FATAL: please assign machine number!");
 		exit(1);
