@@ -18,8 +18,8 @@ constexpr int heartbeat_number = 5;
 constexpr int max_buffer_size = 2048;
 constexpr int port_num = 8815;
 constexpr int fail_time_ms = 3000;
-constexpr int suspect_time_ms = 2000;
-constexpr int suspect_timeout_ms = 2000;
+constexpr int suspect_time_ms = 1500;
+constexpr int suspect_timeout_ms = 1500;
 constexpr int cleanup_time_ms = 15000;
 constexpr int64_t leave_heart_beat = 5e13;
 
@@ -210,7 +210,7 @@ vector<string> random_choose_send_target(set<string> &previous_sent){
     else if(choose_ip_from.size() == heartbeat_number){
         previous_sent = {};
         for(string ip: choose_ip_from){
-            send_target.push_back(ip);
+        send_target.push_back(ip);
         }
     }
     else if(choose_ip_from.size() < heartbeat_number){
