@@ -170,7 +170,11 @@ void join_group();
 
 void response_join(const string &str);
 
+vector<string> get_alive_other_ips();
+
 void leave_group();
+
+void group_mode_change();
 
 void load_introducer_from_file();
 

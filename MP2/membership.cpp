@@ -103,8 +103,13 @@ void message_receiver() {
                 member_status[{ip, time_stamp}].heart_beat_counter = leave_heart_beat;
                 member_status_lock.unlock();
                 break;
+            case 'C':
+                suspection_mode ^= 1;
+                puts("Receive Mode Change Message!");
+                print_current_mode();
+                break;
             default:
-                throw("FATAL: ");
+                print_to_log("Unsupported Comannd!", true);
         }
         print_to_log("Ready to read next message!", false);
 
@@ -506,9 +511,8 @@ void response_join(const string &str){
     close(sockfd_send);
 }
 
-void leave_group(){
+vector<string> get_alive_other_ips(){
     vector<string> target_ips;
-
     member_status_lock.lock();
     for (auto entry : member_status){
         if(entry.second.status == 0) continue;
@@ -516,13 +520,24 @@ void leave_group(){
         target_ips.push_back(entry.first.first);
     }
     member_status_lock.unlock();
+    return target_ips;
+}
 
-    //(3) open socket and send the message
+void leave_group(){
+    vector<string> target_ips = get_alive_other_ips();
     string msg = "L" + machine_id.first + "#" + to_string(machine_id.second) + "#"; 
     for(int i = 0; i < target_ips.size(); i++){
         send_a_udp_message(target_ips[i], msg);
     } 
     
+}
+
+void group_mode_change(){
+    vector<string> target_ips = get_alive_other_ips();
+    string msg = "C";
+    for(int i = 0; i < target_ips.size(); i++){
+        thread(send_a_udp_message, target_ips[i], msg).detach();
+    } 
 }
 
 void load_introducer_from_file() {
@@ -588,6 +603,10 @@ int main(int argc, char *argv[]){
             print_to_log(node_id_to_string(machine_id) + " has left", true);
             return 0;
         } else if(input == "CHANGE" || input == "C") {
+            suspection_mode ^= 1;
+            print_current_mode();
+            group_mode_change();
+        } else if(input == "LOCAL" || input == "LOCALC" || input == "LOCALCHANGE"){
             suspection_mode ^= 1;
             print_current_mode();
         } else {
