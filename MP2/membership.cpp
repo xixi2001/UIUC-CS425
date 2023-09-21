@@ -22,6 +22,7 @@ constexpr int suspect_time_ms = 1500;
 constexpr int suspect_timeout_ms = 1500;
 constexpr int cleanup_time_ms = 15000;
 constexpr int64_t leave_heart_beat = 5e13;
+constexpr double dropout_rate = 0.1;
 
 int64_t ParseIntUntil(int &idx,const string& str, char c){
     int64_t res = 0;
@@ -236,8 +237,15 @@ vector<string> random_choose_send_target(set<string> &previous_sent){
     send_target.resize(unique(send_target.begin(), send_target.end()) - send_target.begin());
     return send_target;
 }
+double random_generator(){
+    int x = rand() % (1<<10);
+    return (double)x/(1<<10);
+}
 
 void send_a_udp_message(string ip, string msg) {
+    if(random_generator() < dropout_rate) {
+        return;
+    }
     int sockfd;
     struct sockaddr_in servaddr;
     struct hostent *server;
