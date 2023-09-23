@@ -21,8 +21,9 @@ constexpr int fail_time_ms = 3000;
 constexpr int suspect_time_ms = 1500;
 constexpr int suspect_timeout_ms = 1500;
 constexpr int cleanup_time_ms = 15000;
+constexpr int heartbeat_rate_ms = 500;
 constexpr int64_t leave_heart_beat = 5e13;
-constexpr double dropout_rate = 0.1;
+constexpr double dropout_rate = 00;
 
 int64_t ParseIntUntil(int &idx,const string& str, char c){
     int64_t res = 0;
@@ -282,7 +283,7 @@ void heartbeat_sender(){
     set<string> previous_sent;
     int64_t last_update_time = cur_time_in_ms();
     while(true){
-        while(cur_time_in_ms() - last_update_time < 500)continue;
+        while(cur_time_in_ms() - last_update_time < heartbeat_rate_ms)continue;
         last_update_time = cur_time_in_ms();
         //(1) randomly select, reminder: use lock
         vector<string> target_ips;
@@ -581,6 +582,7 @@ void save_current_status_to_log() {
 }
 
 int main(int argc, char *argv[]){
+    srand(time(NULL));
     init_ip_list();
     if(argc != 2 && argc != 3){
 		puts("FATAL: please assign machine number!");
