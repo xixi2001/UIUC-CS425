@@ -180,7 +180,7 @@ int find_next_live_id(const set<int> &s,int x){
 
 set<int> get_new_slave_id(const set<int> &membership_set){
     set<int> res;
-    int cur = find_next_live_id(s, machine_idx);
+    int cur = find_next_live_id(membership_set, machine_idx);
     while(res.size() <= 3 && cur != machine_idx){
         res.insert(cur);
         cur = find_next_live_id(s, cur);
