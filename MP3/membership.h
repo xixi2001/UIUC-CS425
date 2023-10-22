@@ -56,6 +56,7 @@ inline void print_to_membership_log(const string &str, bool print_out){
     fout_lock.unlock();
 }
 map<string, string> ip_to_machine; // only write in main, no mutex needed 
+map<int, string> machine_idx_to_ip;
 void init_ip_list(){
     ip_to_machine["172.22.94.78"] = "1";
     ip_to_machine["172.22.156.79"] = "2";
@@ -67,6 +68,17 @@ void init_ip_list(){
     ip_to_machine["172.22.156.81"] = "8";
     ip_to_machine["172.22.158.81"] = "9";
     ip_to_machine["172.22.94.81"] = "10";
+
+    machine_idx_to_ip[0] = "172.22.94.78";
+    machine_idx_to_ip[1] = "172.22.156.79";
+    machine_idx_to_ip[2] = "172.22.158.79";
+    machine_idx_to_ip[3] = "172.22.94.79";
+    machine_idx_to_ip[4] = "172.22.156.80";
+    machine_idx_to_ip[5] = "172.22.158.80";
+    machine_idx_to_ip[6] = "172.22.94.80";
+    machine_idx_to_ip[7] = "172.22.156.81";
+    machine_idx_to_ip[8] = "172.22.158.81";
+    machine_idx_to_ip[9] = "172.22.94.81";
 }
 bool print_cmp(pair <pair<string,int64_t>, MemberEntry > A, pair <pair<string,int64_t>, MemberEntry > B) {
     return stoi(A.first.first) < stoi(B.first.first);
@@ -181,12 +193,9 @@ void load_introducer_from_file();
 void save_current_status_to_log();
 
 vector<int> get_current_live_membership_list();
-/*
-TODO:
-return current live machine INDEX
-*/
+
+int get_index_from_ip_address(const string &str);
 
 string get_ip_address_from_index(int index);
-//TODO
 
 void start_membership_service(string ip);

@@ -582,6 +582,7 @@ void save_current_status_to_log() {
 }
 
 void start_membership_service(string ip){
+    init_ip_list();
     if(machine_id.first == introducer_ip_address){ // introducer 
         load_introducer_from_file();
     } else { // others join the group 
@@ -634,3 +635,20 @@ void start_membership_service(string ip){
 //         }
 //     }
 // }
+vector<int> get_current_live_membership_list(){
+    vector<int> res;
+    for(auto&[id, entry] : member_status) {
+        if(entry.status == 2){
+            res.push_back((get_index_from_ip_address(id.first)));
+        }
+    }
+    return res;
+}
+
+int get_index_from_ip_address(const string &str){
+    return stoi(ip_to_machine[str]) - 1;
+}
+
+string get_ip_address_from_index(int index){
+    return machine_idx_to_ip[index];
+}
