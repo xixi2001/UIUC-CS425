@@ -33,9 +33,9 @@ void send_a_tcp_message(const string& str, int target_index);
 
 void membership_list_listener();
 
-set<int> get_new_slave_id(const set<int> &membership_set);
+set<int> get_new_slave_idx_set(const set<int> &membership_set);
 
-set<int> get_new_master_id(const set<int> &membership_set);
+set<int> get_new_master_idx_set(const set<int> &membership_set);
 
 int hash_string(const string &str);
 

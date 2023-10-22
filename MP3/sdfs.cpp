@@ -156,20 +156,30 @@ void send_a_tcp_message(const string& str, int target_index){
 void membership_list_listener(){
     set<int> last_membership_set;
     while(true){
-        set<int> new_memebership_set = get_current_live_membership_set();
-        vector<int> join_list, leave_list;
+        set<int> new_membership_set = get_current_live_membership_set();
+        vector<int> join_list, crash_list;
         for(int x:last_membership_set)
-            if(!new_memebership_set.count(x))
-                leave_list.push_back(x);
-        for(int x:new_memebership_set)
+            if(!new_membership_set.count(x))
+                crash_list.push_back(x);
+        for(int x:new_membership_set)
             if(!last_membership_set.count(x))
                 join_list.push_back(x);
-        if( leave_list.size() > 0 || join_list.size() > 0 ) {
-            
+        if( crash_list.size() > 0 || join_list.size() > 0 ) {
             set<int> new_slave_idx = get_new_slave_id(membership_set);
+            for(int x : crash_list) {
+                set<int> delta_slaves;
+                slave_idx_set_lock.lock();
+                for(int x:new_slave_idx)
+                    if(!slave_idx_set.count(x))
+                        delta_slaves.insert(x);
+                slave_idx_set_lock.unlock();
+                handle_crash(x, new_membership_set, delta_slaves);
+            }
+            for(int x : join_list){
+                handle_join(x, new_membership_set, new_slave_idx, get_new_master_idx_set());
+            }
 
-
-            last_membership_set = new_memebership_set;
+            last_membership_set = new_membership_set;
             slave_idx_set_lock.lock();
             slave_idx_set = new_slave_idx;
             slave_idx_set_lock.unlock();
@@ -185,7 +195,7 @@ int find_next_live_id(const set<int> &s,int x){
     return x;
 }
 
-set<int> get_new_slave_id(const set<int> &membership_set){
+set<int> get_new_slave_idx_set(const set<int> &membership_set){
     set<int> res;
     int cur = find_next_live_id(membership_set, machine_idx);
     while(res.size() <= 3 && cur != machine_idx){
@@ -202,7 +212,7 @@ int find_last_live_id(const set<int> &s,int x){
     return x;
 }
 
-set<int> get_new_master_id(const set<int> &membership_set){
+set<int> get_new_master_idx_set(const set<int> &membership_set){
     set<int> res;
     int cur = find_last_live_id(membership_set, machine_idx);
     while(res.size() <= 3 && cur != machine_idx){
@@ -219,7 +229,11 @@ int hash_string(const string &str){
 }
 
 int find_master(const set<int> &membership_set, int hash_value){
-    return find_next_live_id(membership_set, hash_value);
+    int x = hash_value;
+    while(!membership_set.count(x)){
+        x = (x + 1) % 10;
+    }
+    return x;
 }
 
 void handle_crash(int crash_idx, const set<int> &new_membership_set, const set<int>& delta_slaves){
@@ -256,11 +270,26 @@ void handle_join(int join_idx, const set<int> &new_membership_set, const set<int
 
 }
 
+int64_t start_time_ms;
+mutex fsdfs_out_lock;
+ofstream fsdfs_out;
 void print_to_sdfs_log(const string& str, bool flag){
-
+    int64_t current_time_ms = cur_time_in_ms(); 
+    if(flag)
+        cout << "[" << current_time_ms - start_time_ms << "] " << str << endl;
+    fsdfs_out_lock.lock();
+    fsdfs_out << "[" << current_time_ms - start_time_ms << "] " << str << endl;
+    fsdfs_out_lock.unlock();
 }
 
-int main(){
+int main(int argc, char *argv[]){
+    if(argc != 2){
+        puts("FATAL: please assign machine index!");
+        exit(0);
+    }
+    machine_idx = stoi(argv[1]);
+    start_time_ms = cur_time_in_ms();
+    fsdfs_out.open( std::to_string() + "_" + std::to_string(start_time_ms) +".log");
     // start_membership_service("172.22.94.78");
     // cout << get_ip_address_from_index(0) << endl;
 }
