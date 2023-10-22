@@ -140,26 +140,6 @@ void send_a_tcp_message(const string& str, int target_index){
         puts("Socket write fail!");
         throw runtime_error("Socket write fail!");
 	}
-	
-	close(fd);
-}
-
-void membership_list_listener(){
-    set<int> last_alive_membership_set;
-    while(true){
-        set<int> new_memebership_set = get_current_live_membership_set();
-        vector<int> join_list, leave_list;
-        for(int x:last_alive_membership_set)
-            if(!new_memebership_set.count(x))
-                leave_list.push_back(x);
-        for(int x:new_memebership_set)
-            if(!last_alive_membership_set.count(x))
-                join_list.push_back(x);
-        if( leave_list.size() > 0 || join_list.size() > 0 ) {
-            last_alive_membership_list = 
-        }
-        this_thread::sleep_for(chrono::milliseconds(100));
-    }
     char ret[max_buffer_size];
     if(str[0]== 'G'){
         if((nbytes=recv(fd, ret, sizeof(ret),0)) < 0){//"read" will block until receive data 
@@ -168,7 +148,34 @@ void membership_list_listener(){
         }
         cout << ret << endl;
     }
+	
+	close(fd);
+    
+}
 
+void membership_list_listener(){
+    set<int> last_membership_set;
+    while(true){
+        set<int> new_memebership_set = get_current_live_membership_set();
+        vector<int> join_list, leave_list;
+        for(int x:last_membership_set)
+            if(!new_memebership_set.count(x))
+                leave_list.push_back(x);
+        for(int x:new_memebership_set)
+            if(!last_membership_set.count(x))
+                join_list.push_back(x);
+        if( leave_list.size() > 0 || join_list.size() > 0 ) {
+            
+            set<int> new_slave_idx = get_new_slave_id(membership_set);
+
+
+            last_membership_set = new_memebership_set;
+            slave_idx_set_lock.lock();
+            slave_idx_set = new_slave_idx;
+            slave_idx_set_lock.unlock();
+        }
+        this_thread::sleep_for(chrono::milliseconds(100));
+    }
 }
 
 int find_next_live_id(const set<int> &s,int x){
