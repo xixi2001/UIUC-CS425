@@ -33,35 +33,35 @@ void send_a_tcp_message(const string& str, int target_index);
 
 void membership_list_listener();
 
-vector<int> get_new_slave_id();
+set<int> get_new_slave_id(const set<int> &membership_set);
 
-vector<int> get_new_master_id();
+set<int> get_new_master_id(const set<int> &membership_set);
 
 int hash_string(const string &str);
 
-int find_master(const set<int> &s, int hash_value);// give the hash value, find corresponding master
+int find_master(const set<int> &membership_set, int hash_value);// give the hash value, find corresponding master
 
-void handle_crash(int crash_idx);
+void handle_crash(int crash_idx, const set<int> &new_membership_set, const set<int>& delta_slaves);
 /*
 if is the NEXT machine of crash_idx:
     change corresponding slaves files to master files
     send new master files to all the slaves
-if slave_id != get_new_slave_id()
+for slave: delta_slaves
     send all master files to the new slave
 
-slave_id = get_new_slave_id();
 */
 
-void handle_join(int join_idx);
+void handle_join(int join_idx, const set<int> &new_membership_set, const set<int> &new_slaves, const set<int> &new_masters);
 /*
 if is the NEXT machine of join_idx:
     send corresponding master files to join_idx
     delete those files AND send 'd' to slaves
 
 if is the master of join_idx:
-    send all master diles to join_idx
+    send all master files to join_idx
 
-delete all the slave files not in get_new_master_id()
+delete all the slave files not in new_masters
+
 */
 
 void print_to_sdfs_log(const string& str, bool flag);

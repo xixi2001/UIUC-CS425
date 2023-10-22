@@ -121,8 +121,6 @@ void load_introducer_from_file();
 
 void save_current_status_to_log();
 
-vector<int> get_current_live_membership_list();
-
 set<int> get_current_live_membership_set();
 
 int get_index_from_ip_address(const string &str);

@@ -730,24 +730,16 @@ void start_membership_service(string ip){
 //         }
 //     }
 // }
-vector<int> get_current_live_membership_list(){
-    vector<int> res;
+set<int> get_current_live_membership_set(){
+    set<int> res;
     member_status_lock.lock();
     for(auto&[id, entry] : member_status) {
         if(entry.status == 2){
-            res.push_back((get_index_from_ip_address(id.first)));
+            res.insert((get_index_from_ip_address(id.first)));
         }
     }
     member_status_lock.unlock();
     return res;
-}
-
-set<int> get_current_live_membership_set(){
-    set<int> res;
-    for(auto x: get_current_live_membership_list()){
-        res.insert(x);
-    }
-    return x;
 }
 
 int get_index_from_ip_address(const string &str){
