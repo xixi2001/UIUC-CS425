@@ -15,7 +15,7 @@ int machine_idx;
 mutex master_files_lock;
 set<string> master_files; // files save as master; string is the file name
 mutex slave_files_lock;
-set<pair<string,int> > slave_files;  // files save as slave;string is file name; int is hash value
+set<string> slave_files;  // files save as slave;string is file name; int is hash value
 mutex slave_idx_set_lock;
 set<int> slave_idx_set;
 
@@ -75,7 +75,7 @@ void tcp_message_receiver(){
                 break;
             case 'p':
                 slave_files_lock.lock();
-                slave_files.insert({filename, hash_string(filename)});
+                slave_files.insert(filename);
                 slave_files_lock.unlock();
                 break;
             case 'D':
@@ -90,7 +90,7 @@ void tcp_message_receiver(){
                 break;
             case 'd':
                 slave_files_lock.lock();
-                slave_files.erase({filename, hash_string(filename)});
+                slave_files.erase(filename);
                 slave_files_lock.unlock();
                 break;
             case 'G':
@@ -227,6 +227,32 @@ void handle_crash(int crash_idx, const set<int> &new_membership_set, const set<i
 }
 
 void handle_join(int join_idx, const set<int> &new_membership_set, const set<int> &new_slaves, const set<int> &new_masters){
+    if(machine_idx == find_next_live_id(new_membership_set, join_idx)){
+        vector<string> master_file_to_delete;
+        for(string master_file : master_files){
+            if(find_master(new_membership_set, hash_string(master_file)) == join_idx){
+                thread(send_a_tcp_message, "P" + master_file, join_idx);
+                master_file_to_delete.push_back(master_file);
+            }
+        }
+        
+        for(string filename : master_file_to_delete)
+            master_files.erase(filename); 
+    }
+    
+    if(new_slaves.find(join_idx) != new_slaves.end()){
+        for(string master_file : master_files)
+            thread(send_a_tcp_message, "p" + master_file, join_idx);
+    }
+
+    vector<string> slave_file_to_delete;
+    for(string slave_file : slave_files){
+        if(new_masters.find(find_master(new_membership_set, hash_string(slave_file))) 
+                == new_masters.end())
+            slave_file_to_delete.push_back(slave_file);
+    }
+    for(string filename : slave_file_to_delete)
+        slave_file.erase(filename);
 
 }
 

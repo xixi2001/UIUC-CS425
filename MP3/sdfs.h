@@ -55,7 +55,7 @@ void handle_join(int join_idx, const set<int> &new_membership_set, const set<int
 /*
 if is the NEXT machine of join_idx:
     send corresponding master files to join_idx
-    delete those files AND send 'd' to slaves
+    delete those files
 
 if is the master of join_idx:
     send all master files to join_idx
