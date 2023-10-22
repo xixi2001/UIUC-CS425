@@ -1,4 +1,8 @@
+#ifndef _MEMBERSHIP_H
+#define _MEMBERSHIP_H
+
 #include <iostream>
+#include <fstream>
 #include <chrono>
 #include <mutex>
 #include <cstring>
@@ -6,6 +10,8 @@
 #include <map>
 #include <iterator>
 #include <algorithm>
+#include <sstream>
+#include <set>
 using namespace std;
 
 struct MemberEntry {
@@ -27,96 +33,19 @@ struct MemberEntry {
     }
 };
 
-mutex member_status_lock;
-map<pair<string,int64_t>, MemberEntry> member_status;
-// id: <ip_address, time_stamp>
+int64_t cur_time_in_ms();
 
-pair<string, int64_t> machine_id;
- 
-bool suspection_mode = 0;// only one writter, no mutex needed
+inline string node_id_to_string(const pair<string,int64_t> &machine_id);
 
-mutex fout_lock;
-ofstream fout;
+inline void print_to_membership_log(const string &str, bool print_out);
+bool print_cmp(pair <pair<string,int64_t>, MemberEntry > A, pair <pair<string,int64_t>, MemberEntry > B);
 
-int64_t cur_time_in_ms(){
-    return (int64_t) chrono::duration_cast<chrono::milliseconds>(
-            chrono::system_clock::now().time_since_epoch()).count();
-}
-
-inline string node_id_to_string(const pair<string,int64_t> &machine_id) {
-    return "(" + machine_id.first +", " + std::to_string(machine_id.second)  + ")";
-}
-
-inline void print_to_membership_log(const string &str, bool print_out){
-    int64_t current_time_ms = cur_time_in_ms(); 
-    if(print_out)
-        cout << "[" << current_time_ms - machine_id.second << "] " << str << endl;
-    fout_lock.lock();
-    fout << "[" << current_time_ms - machine_id.second << "] " << str << endl;
-    fout_lock.unlock();
-}
-map<string, string> ip_to_machine; // only write in main, no mutex needed 
-map<int, string> machine_idx_to_ip;
-void init_ip_list(){
-    ip_to_machine["172.22.94.78"] = "1";
-    ip_to_machine["172.22.156.79"] = "2";
-    ip_to_machine["172.22.158.79"] = "3";
-    ip_to_machine["172.22.94.79"] = "4";
-    ip_to_machine["172.22.156.80"] = "5";
-    ip_to_machine["172.22.158.80"] = "6";
-    ip_to_machine["172.22.94.80"] = "7";
-    ip_to_machine["172.22.156.81"] = "8";
-    ip_to_machine["172.22.158.81"] = "9";
-    ip_to_machine["172.22.94.81"] = "10";
-
-    machine_idx_to_ip[0] = "172.22.94.78";
-    machine_idx_to_ip[1] = "172.22.156.79";
-    machine_idx_to_ip[2] = "172.22.158.79";
-    machine_idx_to_ip[3] = "172.22.94.79";
-    machine_idx_to_ip[4] = "172.22.156.80";
-    machine_idx_to_ip[5] = "172.22.158.80";
-    machine_idx_to_ip[6] = "172.22.94.80";
-    machine_idx_to_ip[7] = "172.22.156.81";
-    machine_idx_to_ip[8] = "172.22.158.81";
-    machine_idx_to_ip[9] = "172.22.94.81";
-}
-bool print_cmp(pair <pair<string,int64_t>, MemberEntry > A, pair <pair<string,int64_t>, MemberEntry > B) {
-    return stoi(A.first.first) < stoi(B.first.first);
-}
-void print_membership_list(){
-    vector<pair <pair<string,int64_t>, MemberEntry > >tmp; 
-    member_status_lock.lock();
-    for(const auto& [ip, entry] : member_status){
-        pair<string,int64_t> new_id({ip_to_machine[ip.first], ip.second});
-        tmp.push_back({new_id, entry});
-    }
-    member_status_lock.unlock();
-    sort(tmp.begin(), tmp.end(), print_cmp);
-    stringstream ss;
-    ss << "New Membership List: " << endl;
-    for(const auto&[id, entry] : tmp) {
-        if(entry.status > 0) {
-            ss << node_id_to_string(id) << " ";
-        }
-    }
-    
-    print_to_membership_log(ss.str(), true);
-}
+void print_membership_list();
 
 
-void print_detailed_list(const map<pair<string,int64_t>, MemberEntry> & other){
-    stringstream ss;
-    for(auto &[ip, entry] : other) {
-        ss << ip.first << " " << ip.second << ": " << entry.time_stamp_ms << " " << entry.heart_beat_counter << 
-            " " << entry.status << " " << entry.incarnation_count << endl;
-    }
-    print_to_membership_log(ss.str(), false);
-}
+void print_detailed_list(const map<pair<string,int64_t>, MemberEntry> & other);
 
-inline void print_current_mode(){
-    if(suspection_mode) puts("In Gossip+Suspection Mode");
-    else puts("In Gossip Mode");
-}
+inline void print_current_mode();
 
 void message_receiver();
 /*
@@ -199,3 +128,5 @@ int get_index_from_ip_address(const string &str);
 string get_ip_address_from_index(int index);
 
 void start_membership_service(string ip);
+
+#endif

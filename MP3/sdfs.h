@@ -1,4 +1,5 @@
 #include "membership.h"
+#include <set>
 using namespace std;
 
 set<string> master_files; // files save as master; string is the file name
