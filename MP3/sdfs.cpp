@@ -10,10 +10,14 @@
 using namespace std;
 
 int machine_idx;
+mutex last_alive_membership_list_lock;
 vector<int> last_alive_membership_list;
 
+mutex master_files_lock;
 set<string> master_files; // files save as master; string is the file name
+mutex slave_files_lock;
 set<pair<string,int> > slave_files;  // files save as slave;string is file name; int is hash value
+mutex slave_id_lock;
 vector<int> slave_id;
 
 constexpr int max_buffer_size = 1024;
