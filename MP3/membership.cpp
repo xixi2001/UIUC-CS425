@@ -84,17 +84,17 @@ void message_receiver() {
         int idx = 1;
         string ip = ParseStringUntil(idx, msg, '#');
         int64_t time_stamp = 0;
-        print_to_log("receive: " + msg, false);
+        print_to_membership_log("receive: " + msg, false);
         switch(msg[0]){
             case 'J':
-                print_to_log("Receive join request: " + ip, false);
+                print_to_membership_log("Receive join request: " + ip, false);
                 response_join(msg.substr(1));
                 break;
             case 'G':
-                print_to_log("Receive gossip request: " + ip, false);
+                print_to_membership_log("Receive gossip request: " + ip, false);
                 combine_member_entry(message_to_member_entry(msg.substr(1)));
                 print_detailed_list(message_to_member_entry(msg.substr(1)));
-                print_to_log("================== Member Status ================== ", false);
+                print_to_membership_log("================== Member Status ================== ", false);
                 member_status_lock.lock();
                 print_detailed_list(member_status);
                 member_status_lock.unlock();
@@ -111,9 +111,9 @@ void message_receiver() {
                 print_current_mode();
                 break;
             default:
-                print_to_log("Unsupported Comannd!", true);
+                print_to_membership_log("Unsupported Comannd!", true);
         }
-        print_to_log("Ready to read next message!", false);
+        print_to_membership_log("Ready to read next message!", false);
 
     }
     close(sockfd);
@@ -146,7 +146,7 @@ void combine_member_entry(const map<pair<string,int64_t>, MemberEntry> &other){
         if(!member_status.count(id) && entry.status != 0){
             member_status[id] = entry;
             if(entry.status != 0){
-                print_to_log(node_id_to_string(id) + " " + ip_to_machine[id.first] + 
+                print_to_membership_log(node_id_to_string(id) + " " + ip_to_machine[id.first] + 
                                 " has joined", true);
                 is_change = 1;
             }
@@ -160,7 +160,7 @@ void combine_member_entry(const map<pair<string,int64_t>, MemberEntry> &other){
             if(entry.status == 0) {
                 if(correspond.status != 0){
                     correspond.status = 0;
-                    print_to_log(node_id_to_string(id) + " " + ip_to_machine[id.first] + 
+                    print_to_membership_log(node_id_to_string(id) + " " + ip_to_machine[id.first] + 
                                     " has failed by other", true);
                     is_change = 1;                    
                 }
@@ -202,8 +202,8 @@ vector<string> random_choose_send_target(set<string> &previous_sent){
         if(previous_sent.find(entry.first.first) != previous_sent.end()) continue;
         choose_ip_from.push_back(entry.first.first);
     }
-    print_to_log("alive ip: " + to_string(alive_ip.size()), false);
-    print_to_log("ip from: " + to_string(choose_ip_from.size()), false);
+    print_to_membership_log("alive ip: " + to_string(alive_ip.size()), false);
+    print_to_membership_log("ip from: " + to_string(choose_ip_from.size()), false);
     vector<string> send_target;
     if(alive_ip.size() <= heartbeat_number){
         for(string ip : alive_ip)
@@ -251,8 +251,8 @@ void send_a_udp_message(string ip, string msg) {
     struct sockaddr_in servaddr;
     struct hostent *server;
 
-    print_to_log("Send gossip to: " + ip, false);
-    print_to_log(msg, false);
+    print_to_membership_log("Send gossip to: " + ip, false);
+    print_to_membership_log(msg, false);
 
     if ( (sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0 ) {
         puts("Hearbeat sender create socket fail failed!");
@@ -268,14 +268,14 @@ void send_a_udp_message(string ip, string msg) {
     int n;
     socklen_t len;
 
-    print_to_log("start to sent to" + ip, false);
+    print_to_membership_log("start to sent to" + ip, false);
     if(sendto(sockfd, msg.c_str(), msg.size(),
                 MSG_CONFIRM, (const struct sockaddr *) &servaddr, 
                     sizeof(servaddr)) < 0){
         cout << "Heartbeat sender fail to send message to "  <<  ip << endl;
     }
     close(sockfd);
-    print_to_log("sent to " + ip + " success!" , false); 
+    print_to_membership_log("sent to " + ip + " success!" , false); 
 }
 
 void heartbeat_sender(){
@@ -288,7 +288,7 @@ void heartbeat_sender(){
         //(1) randomly select, reminder: use lock
         vector<string> target_ips;
         target_ips = random_choose_send_target(previous_sent);
-        print_to_log("target: " + to_string( target_ips.size() ), false);
+        print_to_membership_log("target: " + to_string( target_ips.size() ), false);
         
         // cout << "Finish choosing send target" <<endl;
 
@@ -345,7 +345,7 @@ void failure_detector(){
         int64_t current_time_ms = cur_time_in_ms();
         while(cur_time_in_ms() - last_update_time < 250)continue;
         last_update_time = current_time_ms;
-        print_to_log("failure detector begin", false);
+        print_to_membership_log("failure detector begin", false);
         member_status_lock.lock();
 
         //update your own member entry
@@ -360,7 +360,7 @@ void failure_detector(){
             if(entry.heart_beat_counter == leave_heart_beat) {
                 //node has leave
                 entry.status = 0; // 0 for failure 
-                print_to_log(node_id_to_string(id) + " " + ip_to_machine[id.first] + 
+                print_to_membership_log(node_id_to_string(id) + " " + ip_to_machine[id.first] + 
                                 " has left", true);
                 has_failure = true;
                 continue;
@@ -368,19 +368,19 @@ void failure_detector(){
             if(suspection_mode) {
                 if(current_time_ms - time_stamp_ms >= suspect_time_ms && entry.status == 2) {
                     entry.status = 1; // 1 for suspect
-                    print_to_log("Suspect " + node_id_to_string(id) + 
+                    print_to_membership_log("Suspect " + node_id_to_string(id) + 
                                     " " + ip_to_machine[id.first], true);
                 }
                 if(current_time_ms - time_stamp_ms >= suspect_time_ms + suspect_timeout_ms) {
                     entry.status = 0; // 0 for failure
-                    print_to_log(node_id_to_string(id) + " " + ip_to_machine[id.first] + 
+                    print_to_membership_log(node_id_to_string(id) + " " + ip_to_machine[id.first] + 
                                     " has failed suspect_timeout ", true);
                     has_failure = true;
                 }
             } else{
                 if(current_time_ms - time_stamp_ms >= fail_time_ms){
                     entry.status = 0; // 0 for failure
-                    print_to_log(node_id_to_string(id) + " " + ip_to_machine[id.first] + 
+                    print_to_membership_log(node_id_to_string(id) + " " + ip_to_machine[id.first] + 
                                     " has failed timeout", true);
                     has_failure = true;
                 }
@@ -393,11 +393,11 @@ void failure_detector(){
         //check self is failed by others
         member_status_lock.lock();
         if(member_status[machine_id].status == 0) {
-            print_to_log("Kicked out by others", true);
+            print_to_membership_log("Kicked out by others", true);
             exit(0);
         }
         member_status_lock.unlock();
-        print_to_log("failure detector end", false);
+        print_to_membership_log("failure detector end", false);
         // this_thread::sleep_for(chrono::milliseconds(250));
     }
 }
@@ -423,7 +423,7 @@ void join_group(){
         int n;
         socklen_t len;
         string msg = "J" + machine_id.first + "#" + to_string(machine_id.second); 
-        print_to_log("send join request: " + msg, false);
+        print_to_membership_log("send join request: " + msg, false);
         if(sendto(sockfd_send, msg.c_str(), msg.size(),
             MSG_CONFIRM, (const struct sockaddr *) &servaddr, 
                 sizeof(servaddr)) < 0){
@@ -475,7 +475,7 @@ void join_group(){
 }
 
 void response_join(const string &str){
-    print_to_log("reponse: " + str, false);
+    print_to_membership_log("reponse: " + str, false);
     int idx = 0;
     string ip = ParseStringUntil(idx, str, '#');
     int64_t time_stamp = ParseIntUntil(idx, str, '#');
@@ -484,7 +484,7 @@ void response_join(const string &str){
     member_status[{ip, time_stamp}].time_stamp_ms = cur_time_in_ms();
     member_status[{ip, time_stamp}].heart_beat_counter = time_stamp;
     member_status_lock.unlock();
-    print_to_log(node_id_to_string({ip, time_stamp}) + " " + ip_to_machine[ip] + " has joined", true);
+    print_to_membership_log(node_id_to_string({ip, time_stamp}) + " " + ip_to_machine[ip] + " has joined", true);
     print_membership_list();
 
     int sockfd_send;
@@ -581,46 +581,56 @@ void save_current_status_to_log() {
     fout.close();
 }
 
-int main(int argc, char *argv[]){
-    srand(time(NULL));
-    init_ip_list();
-    if(argc != 2 && argc != 3){
-		puts("FATAL: please assign machine number!");
-		exit(1);
-	}
-    machine_id.first = argv[1];
-    machine_id.second = cur_time_in_ms();
-    fout.open(node_id_to_string(machine_id) + ".log");
+void start_membership_service(string ip){
     if(machine_id.first == introducer_ip_address){ // introducer 
         load_introducer_from_file();
     } else { // others join the group 
         join_group();
     }
-    if(argc == 3){
-        suspection_mode = stoi(argv[2]);
-    }
+    
     print_current_mode();
 
     cout << "Start detaching receiver, sender, detector..." << endl; 
     thread receiver(message_receiver);receiver.detach();
     thread sender(heartbeat_sender);sender.detach();
     thread detector(failure_detector);detector.detach();
-
-    string input;
-    while(cin >> input){
-        if(input == "LEAVE" || input == "L") {
-            leave_group();
-            print_to_log(node_id_to_string(machine_id) + " has left", true);
-            return 0;
-        } else if(input == "CHANGE" || input == "C") {
-            suspection_mode ^= 1;
-            print_current_mode();
-            group_mode_change();
-        } else if(input == "LOCAL" || input == "LOCALC" || input == "LOCALCHANGE"){
-            suspection_mode ^= 1;
-            print_current_mode();
-        } else {
-            puts("Unsupported command, input again!");
-        }
-    }
+    
 }
+
+// int main(int argc, char *argv[]){
+//     srand(time(NULL));
+//     init_ip_list();
+//     if(argc != 2 && argc != 3){
+// 		puts("FATAL: please assign machine number!");
+// 		exit(1);
+// 	}
+//     machine_id.first = argv[1];
+//     machine_id.second = cur_time_in_ms();
+//     fout.open(node_id_to_string(machine_id) + ".log");
+//     if(machine_id.first == introducer_ip_address){ // introducer 
+//         load_introducer_from_file();
+//     } else { // others join the group 
+//         join_group();
+//     }
+//     if(argc == 3){
+//         suspection_mode = stoi(argv[2]);
+//     }
+//     print_current_mode();
+//     string input;
+//     while(cin >> input){
+//         if(input == "LEAVE" || input == "L") {
+//             leave_group();
+//             print_to_membership_log(node_id_to_string(machine_id) + " has left", true);
+//             return 0;
+//         } else if(input == "CHANGE" || input == "C") {
+//             suspection_mode ^= 1;
+//             print_current_mode();
+//             group_mode_change();
+//         } else if(input == "LOCAL" || input == "LOCALC" || input == "LOCALCHANGE"){
+//             suspection_mode ^= 1;
+//             print_current_mode();
+//         } else {
+//             puts("Unsupported command, input again!");
+//         }
+//     }
+// }

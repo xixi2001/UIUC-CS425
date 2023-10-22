@@ -47,7 +47,7 @@ inline string node_id_to_string(const pair<string,int64_t> &machine_id) {
     return "(" + machine_id.first +", " + std::to_string(machine_id.second)  + ")";
 }
 
-inline void print_to_log(const string &str, bool print_out){
+inline void print_to_membership_log(const string &str, bool print_out){
     int64_t current_time_ms = cur_time_in_ms(); 
     if(print_out)
         cout << "[" << current_time_ms - machine_id.second << "] " << str << endl;
@@ -88,7 +88,7 @@ void print_membership_list(){
         }
     }
     
-    print_to_log(ss.str(), true);
+    print_to_membership_log(ss.str(), true);
 }
 
 
@@ -98,7 +98,7 @@ void print_detailed_list(const map<pair<string,int64_t>, MemberEntry> & other){
         ss << ip.first << " " << ip.second << ": " << entry.time_stamp_ms << " " << entry.heart_beat_counter << 
             " " << entry.status << " " << entry.incarnation_count << endl;
     }
-    print_to_log(ss.str(), false);
+    print_to_membership_log(ss.str(), false);
 }
 
 inline void print_current_mode(){
@@ -179,3 +179,14 @@ void group_mode_change();
 void load_introducer_from_file();
 
 void save_current_status_to_log();
+
+vector<int> get_current_live_membership_list();
+/*
+TODO:
+return current live machine INDEX
+*/
+
+string get_ip_address_from_index(int index);
+//TODO
+
+void start_membership_service(string ip);
