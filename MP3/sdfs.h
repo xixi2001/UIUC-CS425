@@ -2,10 +2,6 @@
 #include <set>
 using namespace std;
 
-set<string> master_files; // files save as master; string is the file name
-set<pair<string,int> > slave_files;  
-// files save as slave;string is file name; int is hash value
-
 void tcp_message_receiver();
 /*
 while receive a message:
@@ -35,13 +31,7 @@ while receive a message:
 
 void send_a_tcp_message(const string& str, int target_index);
 
-vector<int> last_alive_membership_list;
-
 void membership_list_listener();
-
-vector<int> slave_id;
-
-int machine_idx;
 
 vector<int> get_new_slave_id();
 
@@ -49,7 +39,7 @@ vector<int> get_new_master_id();
 
 int hash_string(const string &str);
 
-int find_master();// give the hash value, find corresponding master
+int find_master(const set<int> &s, int hash_value);// give the hash value, find corresponding master
 
 void handle_crash(int crash_idx);
 /*
