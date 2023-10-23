@@ -151,7 +151,7 @@ void send_a_tcp_message(const string& str, int target_index){
 	srv.sin_family=AF_INET;
 	srv.sin_port=htons(listen_port);
 
-    if (inet_pton(AF_INET, "target_ip", &srv.sin_addr) <= 0) {
+    if (inet_pton(AF_INET, target_ip.c_str(), &srv.sin_addr) <= 0) {
         puts("Invalid address/ Address not supported!");
         throw runtime_error("Invalid address/ Address not supported!");
     }
