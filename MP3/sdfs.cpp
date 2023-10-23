@@ -141,7 +141,7 @@ string to_string(const set<string> s){
 
 void send_a_tcp_message(const string& str, int target_index){
     string target_ip = get_ip_address_from_index(target_index);
-	
+	print_to_sdfs_log("Send a message to " + to_string(target_index+1) + ": " + str, true);
     int fd;
 	if((fd=socket(AF_INET,SOCK_STREAM,0))<0){//create a socket
 		puts("TCP message sender build fail!");
@@ -194,7 +194,7 @@ void membership_listener(){
         if( crash_list.size() > 0 || join_list.size() > 0 ) {
             set<int> new_slave_idx = get_new_slave_idx_set(new_membership_set);
             for(int x : crash_list) {
-                print_to_sdfs_log("handle " + to_string(x) + " Crasehed", true);
+                print_to_sdfs_log("handle " + to_string(x + 1) + " Crasehed", true);
                 set<int> delta_slaves;
                 slave_idx_set_lock.lock();
                 for(int x:new_slave_idx)
@@ -204,7 +204,7 @@ void membership_listener(){
                 handle_crash(x, new_membership_set, delta_slaves);
             }
             for(int x : join_list){
-                print_to_sdfs_log("handle " + to_string(x) + " Joined", true);
+                print_to_sdfs_log("handle " + to_string(x + 1) + " Joined", true);
                 handle_join(x, new_membership_set, new_slave_idx, get_new_master_idx_set(new_membership_set));
             }
 
@@ -382,9 +382,9 @@ int main(int argc, char *argv[]){
         puts("FATAL: please assign machine index!");
         exit(0);
     }
-    machine_idx = stoi(argv[1]);
+    machine_idx = stoi(argv[1]) - 1;
     start_time_ms = cur_time_in_ms();
-    fsdfs_out.open( std::to_string(machine_idx) + "_" + std::to_string(start_time_ms) +".log");
+    fsdfs_out.open( std::to_string(machine_idx + 1) + "_" + std::to_string(start_time_ms) +".log");
     start_membership_service(get_ip_address_from_index(machine_idx));
     thread(tcp_message_receiver).detach();
     thread(membership_listener).detach();
