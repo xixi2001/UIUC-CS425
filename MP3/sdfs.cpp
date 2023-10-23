@@ -288,8 +288,10 @@ void handle_crash(int crash_idx, const set<int> &new_membership_set, const set<i
                     master_files_lock.unlock();
                     
                     slave_idx_set_lock.lock();
+                    print_to_sdfs_log("Start sending new master files to all the slaves", true);
                     for(int slave_id : slave_idx_set){
-                        thread(send_a_tcp_message, "p" + slave_file, slave_id);
+                        print_to_sdfs_log("Start sending new master files to one slave " + to_string(slave_id), true);
+                        thread(send_a_tcp_message, "p" + slave_file, slave_id).detach();
                     }
                     slave_idx_set_lock.unlock();
                 }
@@ -305,7 +307,7 @@ void handle_crash(int crash_idx, const set<int> &new_membership_set, const set<i
     for(int slave: delta_slaves){
         master_files_lock.lock();
         for(string master_file : master_files){
-            thread(send_a_tcp_message, "p" + master_file, slave);
+            thread(send_a_tcp_message, "p" + master_file, slave).detach();
         }
         master_files_lock.unlock();
     }
@@ -320,7 +322,7 @@ void handle_join(int join_idx, const set<int> &new_membership_set, const set<int
         master_files_lock.lock();
         for(string master_file : master_files){
             if(find_master(new_membership_set, hash_string(master_file)) == join_idx){
-                thread(send_a_tcp_message, "P" + master_file, join_idx);
+                thread(send_a_tcp_message, "P" + master_file, join_idx).detach();
                 master_file_to_delete.push_back(master_file);
             }
         }
@@ -333,7 +335,7 @@ void handle_join(int join_idx, const set<int> &new_membership_set, const set<int
     master_files_lock.lock();
     if(new_slaves.find(join_idx) != new_slaves.end()){
         for(string master_file : master_files)
-            thread(send_a_tcp_message, "p" + master_file, join_idx);
+            thread(send_a_tcp_message, "p" + master_file, join_idx).detach();
     }
     master_files_lock.unlock();
 
