@@ -60,6 +60,7 @@ void tcp_message_receiver(){
         string msg_str(msg);
         string filename = msg_str.substr(1);
         string ret;
+        print_to_sdfs_log("Received a message: " + msg_str, false);
         
         switch(msg_str[0]){
             case 'P': // assume message format is P{sdfs_filename}
@@ -72,11 +73,15 @@ void tcp_message_receiver(){
                     thread(send_a_tcp_message, "p" + filename, slave).detach();
                 slave_idx_set_lock.unlock();
                 
+                print_to_sdfs_log("Get master file: " + filename, true);
+                print_current_files();
                 break;
             case 'p':
                 slave_files_lock.lock();
                 slave_files.insert(filename);
                 slave_files_lock.unlock();
+                print_to_sdfs_log("Get slave file: " + filename, true);
+                print_current_files();
                 break;
             case 'D':
                 master_files_lock.lock();
@@ -87,17 +92,25 @@ void tcp_message_receiver(){
                 for(int slave : slave_idx_set)
                     thread(send_a_tcp_message, "d" + filename, slave).detach();
                 slave_idx_set_lock.unlock();
+
+                print_to_sdfs_log("Delete master file: " + filename, true);
+                print_current_files();
                 break;
             case 'd':
                 slave_files_lock.lock();
                 slave_files.erase(filename);
                 slave_files_lock.unlock();
+
+                print_to_sdfs_log("Delete slave file: " + filename, true);
+                print_current_files();
                 break;
             case 'G':
                 if(master_files.find(filename) == master_files.end())
                     ret = "File doesn't exist!";
                 else
                     ret = "File exists!";
+
+                print_to_sdfs_log("Requst " + filename + ": " + ret, true);
 
                 if((nbytes=send(clifd, ret.c_str(), ret.size() ,0))<0){
                     puts("Socket write fail!");
@@ -110,6 +123,20 @@ void tcp_message_receiver(){
         }
 	}
 	close(fd);
+}
+
+string to_string(const set<int> s){
+    stringstream ss;
+    for(int x:s)
+        ss << x << " ";
+    return ss.str();
+}
+
+string to_string(const set<string> s){
+    stringstream ss;
+    for(string x:s)
+        ss << x << " ";
+    return ss.str();
 }
 
 void send_a_tcp_message(const string& str, int target_index){
@@ -146,14 +173,14 @@ void send_a_tcp_message(const string& str, int target_index){
         puts("TCP message receiver read fail!");
                     throw runtime_error("TCP message receiver read fail!");
         }
-        cout << ret << endl;
+        print_to_sdfs_log(ret, true);
     }
 	
 	close(fd);
     
 }
 
-void membership_list_listener(){
+void membership_listener(){
     set<int> last_membership_set;
     while(true){
         set<int> new_membership_set = get_current_live_membership_set();
@@ -165,8 +192,9 @@ void membership_list_listener(){
             if(!last_membership_set.count(x))
                 join_list.push_back(x);
         if( crash_list.size() > 0 || join_list.size() > 0 ) {
-            set<int> new_slave_idx = get_new_slave_id(membership_set);
+            set<int> new_slave_idx = get_new_slave_idx_set(new_membership_set);
             for(int x : crash_list) {
+                print_to_sdfs_log("handle " + to_string(x) + " Crasehed", true);
                 set<int> delta_slaves;
                 slave_idx_set_lock.lock();
                 for(int x:new_slave_idx)
@@ -176,7 +204,8 @@ void membership_list_listener(){
                 handle_crash(x, new_membership_set, delta_slaves);
             }
             for(int x : join_list){
-                handle_join(x, new_membership_set, new_slave_idx, get_new_master_idx_set());
+                print_to_sdfs_log("handle " + to_string(x) + " Joined", true);
+                handle_join(x, new_membership_set, new_slave_idx, get_new_master_idx_set(new_membership_set));
             }
 
             last_membership_set = new_membership_set;
@@ -200,7 +229,7 @@ set<int> get_new_slave_idx_set(const set<int> &membership_set){
     int cur = find_next_live_id(membership_set, machine_idx);
     while(res.size() <= 3 && cur != machine_idx){
         res.insert(cur);
-        cur = find_next_live_id(s, cur);
+        cur = find_next_live_id(membership_set, cur);
     }
     return res;
 }
@@ -237,12 +266,54 @@ int find_master(const set<int> &membership_set, int hash_value){
 }
 
 void handle_crash(int crash_idx, const set<int> &new_membership_set, const set<int>& delta_slaves){
+    print_to_sdfs_log("handle_crash_new_membership_set: " + to_string(new_membership_set), false);
+    print_to_sdfs_log("handle_crash_delta_slaves: " + to_string(delta_slaves), false);
+    if(machine_idx == find_next_live_id(new_membership_set, crash_idx)){
+            vector<string> slave_to_master_file;
+            
+            slave_files_lock.lock();
+            set<string> slave_files_temp = slave_files;
+            slave_files_lock.unlock();
+            
+            for(string slave_file : slave_files_temp){
+                if(find_master(new_membership_set, hash_string(slave_file)) == machine_idx){
+                    slave_to_master_file.push_back(slave_file);
+                    
+                    master_files_lock.lock();
+                    master_files.insert(slave_file);
+                    master_files_lock.unlock();
+                    
+                    slave_idx_set_lock.lock();
+                    for(int slave_id : slave_idx_set){
+                        thread(send_a_tcp_message, "p" + slave_file, slave_id);
+                    }
+                    slave_idx_set_lock.unlock();
+                }
+            }
+            
+            
+            slave_files_lock.lock();
+            for(string filename : slave_to_master_file)
+                slave_files.erase(filename); 
+            slave_files_lock.unlock();
+    }
 
+    for(int slave: delta_slaves){
+        master_files_lock.lock();
+        for(string master_file : master_files){
+            thread(send_a_tcp_message, "p" + master_file, slave);
+        }
+        master_files_lock.unlock();
+    }
 }
 
 void handle_join(int join_idx, const set<int> &new_membership_set, const set<int> &new_slaves, const set<int> &new_masters){
+    print_to_sdfs_log("handle_crash_new_membership_set: " + to_string(new_membership_set), false);
+    print_to_sdfs_log("handle_join_new_slaves: " + to_string(new_slaves), false);
+    print_to_sdfs_log("handle_join_new_masters: " + to_string(new_masters), false);
     if(machine_idx == find_next_live_id(new_membership_set, join_idx)){
         vector<string> master_file_to_delete;
+        master_files_lock.lock();
         for(string master_file : master_files){
             if(find_master(new_membership_set, hash_string(master_file)) == join_idx){
                 thread(send_a_tcp_message, "P" + master_file, join_idx);
@@ -252,22 +323,27 @@ void handle_join(int join_idx, const set<int> &new_membership_set, const set<int
         
         for(string filename : master_file_to_delete)
             master_files.erase(filename); 
+        master_files_lock.unlock();
     }
     
+    master_files_lock.lock();
     if(new_slaves.find(join_idx) != new_slaves.end()){
         for(string master_file : master_files)
             thread(send_a_tcp_message, "p" + master_file, join_idx);
     }
+    master_files_lock.unlock();
 
     vector<string> slave_file_to_delete;
+    
+    slave_files_lock.lock();
     for(string slave_file : slave_files){
         if(new_masters.find(find_master(new_membership_set, hash_string(slave_file))) 
                 == new_masters.end())
             slave_file_to_delete.push_back(slave_file);
     }
     for(string filename : slave_file_to_delete)
-        slave_file.erase(filename);
-
+        slave_files.erase(filename);
+    slave_files_lock.unlock();
 }
 
 int64_t start_time_ms;
@@ -282,6 +358,24 @@ void print_to_sdfs_log(const string& str, bool flag){
     fsdfs_out_lock.unlock();
 }
 
+void print_current_files(){
+    master_files_lock.lock();
+    stringstream ss;
+    ss << "Master files: ";
+    for(string file: master_files)
+        ss << file << " ";
+    print_to_sdfs_log(ss.str(), true);
+    master_files_lock.unlock();
+
+    slave_files_lock.lock();
+    ss.clear();
+    ss << "Slave files: ";
+    for(string file:slave_files)
+        ss << file << " ";
+    print_to_sdfs_log(ss.str(), true);
+    slave_files_lock.lock();
+}
+
 int main(int argc, char *argv[]){
     if(argc != 2){
         puts("FATAL: please assign machine index!");
@@ -289,7 +383,29 @@ int main(int argc, char *argv[]){
     }
     machine_idx = stoi(argv[1]);
     start_time_ms = cur_time_in_ms();
-    fsdfs_out.open( std::to_string() + "_" + std::to_string(start_time_ms) +".log");
-    // start_membership_service("172.22.94.78");
-    // cout << get_ip_address_from_index(0) << endl;
+    fsdfs_out.open( std::to_string(machine_idx) + "_" + std::to_string(start_time_ms) +".log");
+    start_membership_service(get_ip_address_from_index(machine_idx));
+    thread(tcp_message_receiver).detach();
+    thread(membership_listener).detach();
+    
+    string input;
+    while(cin>>input){
+        set<int> membership_set = get_current_live_membership_set();
+        if(input == "Get" || input == "get" || input == "G" || input == "g") {
+            string name;cin>>name;
+            send_a_tcp_message("G"+name, find_master(membership_set, hash_string(name)));
+        } else if(input == "Put" || input == "put" || input == "P" || input == "p") {
+            string name;cin>>name;
+            send_a_tcp_message("P"+name, find_master(membership_set, hash_string(name)));
+        } else if(input == "Delete" || input == "delete" || input == "D" || input == "d") {
+            string name;cin>>name;
+            send_a_tcp_message("D"+name, find_master(membership_set, hash_string(name)));
+        } else if(input == "Store" || input == "store" || input == "S" || input == "s") {
+            //TODO
+        } else if(input == "ls") {
+            print_current_files();
+        } else{
+            puts("Unsupported Command!");
+        }
+    }
 }

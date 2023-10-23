@@ -31,7 +31,7 @@ while receive a message:
 
 void send_a_tcp_message(const string& str, int target_index);
 
-void membership_list_listener();
+void membership_listener();
 
 set<int> get_new_slave_idx_set(const set<int> &membership_set);
 
@@ -65,3 +65,5 @@ delete all the slave files not in new_masters
 */
 
 void print_to_sdfs_log(const string& str, bool flag);
+
+void print_current_files();
