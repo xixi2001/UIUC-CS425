@@ -30,7 +30,7 @@ void tcp_message_receiver(){
 	}
 	struct sockaddr_in srv;
 	srv.sin_family=AF_INET;
-	srv.sin_port=htons(listen_port);
+	srv.sin_port=listen_port;
 	srv.sin_addr.s_addr=htonl(INADDR_ANY);
 	if((bind(fd, (struct sockaddr*) &srv,sizeof(srv)))<0){
 		puts("TCP message receiver bind fail!");
