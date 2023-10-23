@@ -53,6 +53,7 @@ void tcp_message_receiver(){
 		}
 		int nbytes;
         char msg[max_buffer_size];
+        memset(msg, 0, sizeof(msg));
 		if((nbytes=recv(clifd, msg, sizeof(msg),0))<0){//"read" will block until receive data 
 			puts("TCP message receiver read fail!");
             throw runtime_error("TCP message receiver read fail!");
@@ -170,6 +171,7 @@ void send_a_tcp_message(const string& str, int target_index){
         throw runtime_error("Socket write fail!");
 	}
     char ret[max_buffer_size];
+    memset(ret, 0, sizeof(ret));
     if(str[0]== 'G'){
         if((nbytes=recv(fd, ret, sizeof(ret),0)) < 0){//"read" will block until receive data 
         puts("TCP message receiver read fail!");
