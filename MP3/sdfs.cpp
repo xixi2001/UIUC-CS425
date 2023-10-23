@@ -377,6 +377,7 @@ void print_current_files(){
 }
 
 int main(int argc, char *argv[]){
+    init_ip_list();
     if(argc != 2){
         puts("FATAL: please assign machine index!");
         exit(0);

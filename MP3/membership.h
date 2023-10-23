@@ -129,4 +129,6 @@ string get_ip_address_from_index(int index);
 
 void start_membership_service(string ip);
 
+void init_ip_list();
+
 #endif
