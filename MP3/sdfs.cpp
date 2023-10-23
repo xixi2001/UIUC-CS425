@@ -60,7 +60,7 @@ void tcp_message_receiver(){
         string msg_str(msg);
         string filename = msg_str.substr(1);
         string ret;
-        print_to_sdfs_log("Received a message: " + msg_str, false);
+        print_to_sdfs_log("Received a message: " + msg_str, true);
         
         switch(msg_str[0]){
             case 'P': // assume message format is P{sdfs_filename}
@@ -227,7 +227,7 @@ int find_next_live_id(const set<int> &s,int x){
 set<int> get_new_slave_idx_set(const set<int> &membership_set){
     set<int> res;
     int cur = find_next_live_id(membership_set, machine_idx);
-    while(res.size() <= 3 && cur != machine_idx){
+    while(res.size() < 3 && cur != machine_idx){
         res.insert(cur);
         cur = find_next_live_id(membership_set, cur);
     }
@@ -244,7 +244,7 @@ int find_last_live_id(const set<int> &s,int x){
 set<int> get_new_master_idx_set(const set<int> &membership_set){
     set<int> res;
     int cur = find_last_live_id(membership_set, machine_idx);
-    while(res.size() <= 3 && cur != machine_idx){
+    while(res.size() < 3 && cur != machine_idx){
         res.insert(cur);
         cur = find_last_live_id(membership_set, cur);
     }
