@@ -45,6 +45,7 @@ void tcp_message_receiver(){
 	socklen_t cli_len = sizeof(cli);
 	
     while(1){
+
 		clifd=accept(fd, (struct sockaddr*) &cli, &cli_len);//block until accept connection
 		if(clifd<0){
 			puts("TCP message receiver accept fail!");
@@ -121,6 +122,7 @@ void tcp_message_receiver(){
                 puts("Message is in wrong format.");
                 throw runtime_error("Message is in wrong format.");
         }
+        close(clifd);
 	}
 	close(fd);
 }
@@ -368,12 +370,12 @@ void print_current_files(){
     master_files_lock.unlock();
 
     slave_files_lock.lock();
-    ss.clear();
-    ss << "Slave files: ";
+    stringstream sss;
+    sss << "Slave files: ";
     for(string file:slave_files)
-        ss << file << " ";
-    print_to_sdfs_log(ss.str(), true);
-    slave_files_lock.lock();
+        sss << file << " ";
+    print_to_sdfs_log(sss.str(), true);
+    slave_files_lock.unlock();
 }
 
 int main(int argc, char *argv[]){
