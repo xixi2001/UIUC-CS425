@@ -149,7 +149,7 @@ void send_a_tcp_message(const string& str, int target_index){
 	}
 	struct sockaddr_in srv;
 	srv.sin_family=AF_INET;
-	srv.sin_port=htons(listen_port);
+	srv.sin_port=listen_port;
 
     if (inet_pton(AF_INET, target_ip.c_str(), &srv.sin_addr) <= 0) {
         puts("Invalid address/ Address not supported!");

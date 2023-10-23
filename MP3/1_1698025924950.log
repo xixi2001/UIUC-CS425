@@ -1,0 +1,33 @@
+[23] handle 1 Joined
+[23] handle_crash_new_membership_set: 0 
+[23] handle_join_new_slaves: 
+[23] handle_join_new_masters: 
+[1058] handle 5 Joined
+[1059] handle_crash_new_membership_set: 0 4 
+[1059] handle_join_new_slaves: 4 
+[1059] handle_join_new_masters: 4 
+[2107] handle 4 Joined
+[2107] handle_crash_new_membership_set: 0 3 4 
+[2107] handle_join_new_slaves: 3 4 
+[2107] handle_join_new_masters: 3 4 
+[2649] handle 3 Joined
+[2649] handle_crash_new_membership_set: 0 2 3 4 
+[2649] handle_join_new_slaves: 2 3 4 
+[2649] handle_join_new_masters: 2 3 4 
+[7371] handle 2 Joined
+[7371] handle_crash_new_membership_set: 0 1 2 3 4 
+[7371] handle_join_new_slaves: 1 2 3 4 
+[7371] handle_join_new_masters: 1 2 3 4 
+[15522] handle 2 Crasehed
+[15523] handle_crash_new_membership_set: 0 2 3 4 
+[15523] handle_crash_delta_slaves: 
+[124720] handle 2 Joined
+[124720] handle_crash_new_membership_set: 0 1 2 3 4 
+[124720] handle_join_new_slaves: 1 2 3 4 
+[124720] handle_join_new_masters: 1 2 3 4 
+[129437] Received a message: PCDD
+[129438] Get master file: CDD
+[129438] Master files: CDD 
+[129438] Master files: CDD Slave files: 
+[129449] Send a message to 2: pCDD
+[129449] Send a message to 4: pCDD
