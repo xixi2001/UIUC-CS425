@@ -76,7 +76,8 @@ void send_file(string src, string dst, int target_idx, string cmd){
 
     ifstream readSrcFile(src);
     if(readSrcFile){
-		perror("Cannot open source file");
+        puts("Cannot open source file");
+        throw runtime_error("Cannot open source file");
 	}
     string str((istreambuf_iterator<char>(readSrcFile)), istreambuf_iterator<char>());
     const char *c_str = str.c_str();
@@ -132,7 +133,7 @@ void file_receiver(){
         string filename = msg_str.substr(1);
 
         string res = cmd + " Confirm";
-	    if((nbytes=send(fd, res.c_str(), res.size(), 0))<0){ 
+	    if((nbytes=send(clifd, res.c_str(), res.size(), 0))<0){ 
             puts("Socket write fail!");
             throw runtime_error("Socket write fail!");
 	    }
