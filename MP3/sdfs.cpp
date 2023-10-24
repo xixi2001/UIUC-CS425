@@ -23,8 +23,20 @@ set<int> slave_idx_set;
 constexpr int max_buffer_size = 1024;
 constexpr int listen_port = 1022;
 constexpr int file_receiver_port = 1020;
+constexpr int receive_buffer_size = 5e6;
 
-void file_sender(string local_filename, string sdfs_filename, int target_idx, string cmd){
+vector<string> tokenize(string input, char delimeter){
+    istringstream ss(input);
+    string token;
+    vector<string> ret;
+    while(getline(ss, token, delimeter)){
+        ret.push_back(token);
+    }
+
+    return ret;
+}
+
+void send_file(string src, string dst, int target_idx, string cmd){
     string target_ip = get_ip_address_from_index(target_idx);
 	
     int fd;
@@ -45,21 +57,25 @@ void file_sender(string local_filename, string sdfs_filename, int target_idx, st
         puts("Timeout when connecting!");
         throw runtime_error("Timeout when connecting!");
 	}
-	// send command to the server
-	int nbytes;
 
-	if((nbytes=send(fd, cmd.c_str(), cmd.size(), 0))<0){ 
+    string info = cmd + dst;
+    int nbytes;
+	if((nbytes=send(fd, info.c_str(), info.size(), 0))<0){ 
         puts("Socket write fail!");
         throw runtime_error("Socket write fail!");
 	}
-    char ret[max_buffer_size];
-    memset(ret, 0, sizeof(ret));
-    if((nbytes=recv(fd, ret, sizeof(ret),0)) < 0){//"read" will block until receive data 
-        puts("TCP message receiver read fail!");
-                    throw runtime_error("TCP message receiver read fail!");
-        }
-        print_to_sdfs_log(ret, true);
-	
+
+    ifstream readSrcFile(src);
+    if(readSrcFile){
+		perror("Cannot open source file");
+	}
+    string str((istreambuf_iterator<char>(readSrcFile)), istreambuf_iterator<char>());
+    const char *c_str = str.c_str();
+
+    if((nbytes=send(fd, c_str, strlen(c_str),0))<0){
+        throw("FATAL: socket write fail");
+    }
+
 	close(fd);
 }
 
@@ -91,26 +107,40 @@ void file_receiver(){
 			puts("File receiver accept fail!");
             throw runtime_error("File receiver accept fail!");
 		}
+
+        // Receive intial message including command and filename 
 		int nbytes;
         char msg[max_buffer_size];
         memset(msg, 0, sizeof(msg));
-		if((nbytes=recv(clifd, msg, sizeof(msg),0))<0){//"read" will block until receive data 
+		if((nbytes=recv(clifd, msg, sizeof(msg),0))<0){
 			puts("File receiver read fail!");
             throw runtime_error("File receiver read fail!");
 		}
 
         string msg_str(msg);
+        char cmd = msg_str[0];
         string filename = msg_str.substr(1);
-        string ret;
-        print_to_sdfs_log("Received a message: " + msg_str, true);
+
+        // Start transfering file
+        ofstream dst_file(filename);
         
-        if(msg == "put"){
+        char buf[receive_buffer_size];
+        memset(buf, 0, sizeof(buf));
 
+        while(read(clifd, buf, sizeof(buf))) {
+            dst_file << buf;
+            memset(buf, 0, sizeof(buf));
         }
-        else if(msg == "get"){
+        dst_file.close();
 
-        }
         close(clifd);
+
+        if(cmd == 'P'){
+            slave_idx_set_lock.lock();
+            for(int slave_idx : slave_idx_set)
+                thread(send_file, filename, filename, slave_idx, "p").detach();
+            slave_idx_set_lock.unlock();
+        }
 	}
 	close(fd);
 }
@@ -153,39 +183,22 @@ void tcp_message_receiver(){
 		}
 
         string msg_str(msg);
-        string filename = msg_str.substr(1);
+        vector<string> info;
+        info = tokenize(msg_str.substr(1), ' ');
+        string filename = info[0];
         string ret;
+
         print_to_sdfs_log("Received a message: " + msg_str, true);
         
         switch(msg_str[0]){
-            case 'P': // assume message format is P{sdfs_filename}
-                master_files_lock.lock();
-                master_files.insert(filename);
-                master_files_lock.unlock();
-                
-                slave_idx_set_lock.lock();
-                for(int slave : slave_idx_set)
-                    thread(send_a_tcp_message, "p" + filename, slave).detach();
-                slave_idx_set_lock.unlock();
-                
-                print_to_sdfs_log("Get master file: " + filename, true);
-                print_current_files();
-                break;
-            case 'p':
-                slave_files_lock.lock();
-                slave_files.insert(filename);
-                slave_files_lock.unlock();
-                print_to_sdfs_log("Get slave file: " + filename, true);
-                print_current_files();
-                break;
             case 'D':
                 master_files_lock.lock();
-                /*if (master_files.find(filename) != master_files.end()){
+                if (master_files.find(filename) != master_files.end()){
                     if(remove(filename.c_str()) != 0){
                         puts("Master file delete fail!");
                         throw runtime_error("Master file delete fail!");
                     }
-                }*/
+                }
                 master_files.erase(filename);
                 master_files_lock.unlock();
                 
@@ -200,12 +213,12 @@ void tcp_message_receiver(){
             case 'd':
                 slave_files_lock.lock();
                 // TODO: what happens if a localfile has the same name as a sdfsfile
-                /*if (slave_files.find(filename) != slave_files.end()){
+                if (slave_files.find(filename) != slave_files.end()){
                     if(remove(filename.c_str()) != 0){
                         puts("Slave file delete fail!");
                         throw runtime_error("Slave file delete fail!");
                     }
-                }*/
+                }
                 slave_files.erase(filename);
                 slave_files_lock.unlock();
 
@@ -213,10 +226,12 @@ void tcp_message_receiver(){
                 print_current_files();
                 break;
             case 'G':
-                if(master_files.find(filename) == master_files.end())
+                if(master_files.find(info[0]) == master_files.end())
                     ret = "File doesn't exist!";
-                else
+                else{
                     ret = "File exists!";
+                    thread(send_file, info[0], info[1], stoi(info[2]), "G").detach();
+                }
 
                 print_to_sdfs_log("Requst " + filename + ": " + ret, true);
 
@@ -506,11 +521,13 @@ int main(int argc, char *argv[]){
     while(cin>>input){
         set<int> membership_set = get_current_live_membership_set();
         if(input == "Get" || input == "get" || input == "G" || input == "g") {
-            string name;cin>>name;
-            send_a_tcp_message("G"+name, find_master(membership_set, hash_string(name)));
+            string sdfsfilename;cin>>sdfsfilename;
+            string localfilename;cin>>localfilename;
+            send_a_tcp_message("G"+sdfsfilename+" "+localfilename+" "+to_string(machine_idx), find_master(membership_set, hash_string(sdfsfilename)));
         } else if(input == "Put" || input == "put" || input == "P" || input == "p") {
-            string name;cin>>name;
-            send_a_tcp_message("P"+name, find_master(membership_set, hash_string(name)));
+            string localfilename;cin>>localfilename;
+            string sdfsfilename;cin>>sdfsfilename;
+            send_file(localfilename, sdfsfilename, hash_string(sdfsfilename), "P");
         } else if(input == "Delete" || input == "delete" || input == "D" || input == "d") {
             string name;cin>>name;
             send_a_tcp_message("D"+name, find_master(membership_set, hash_string(name)));
