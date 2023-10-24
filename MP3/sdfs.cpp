@@ -65,6 +65,7 @@ void send_file(string src, string dst, int target_idx, string cmd){
         puts("Socket write fail!");
         throw runtime_error("Socket write fail!");
 	}
+    print_to_sdfs_log(info, true);
 
     char ret[max_buffer_size];
     memset(ret, 0, sizeof(ret));
@@ -72,6 +73,7 @@ void send_file(string src, string dst, int target_idx, string cmd){
         puts("File sender read fail!");
         throw runtime_error("File sender read fail!");
     }
+    print_to_sdfs_log("Line 75", true);
     print_to_sdfs_log(ret, true);
 
     ifstream readSrcFile(src);
@@ -137,6 +139,7 @@ void file_receiver(){
             puts("Socket write fail!");
             throw runtime_error("Socket write fail!");
 	    }
+        print_to_sdfs_log(res, true);
 
         // Start transfering file
         ofstream dst_file(filename);
