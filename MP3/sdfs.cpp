@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <iostream>
 #include <fstream>
+#include <cstdio>
 using namespace std;
 
 int machine_idx;
@@ -21,12 +22,104 @@ set<int> slave_idx_set;
 
 constexpr int max_buffer_size = 1024;
 constexpr int listen_port = 1022;
+constexpr int file_receiver_port = 1020;
+
+void file_sender(string local_filename, string sdfs_filename, int target_idx, string cmd){
+    string target_ip = get_ip_address_from_index(target_idx);
+	
+    int fd;
+	if((fd=socket(AF_INET,SOCK_STREAM,0))<0){//create a socket
+		puts("File sender build fail!");
+        throw runtime_error("File sender build fail!");
+	}
+	struct sockaddr_in srv;
+	srv.sin_family=AF_INET;
+	srv.sin_port=1020;
+
+    if (inet_pton(AF_INET, target_ip.c_str(), &srv.sin_addr) <= 0) {
+        puts("Invalid address/ Address not supported!");
+        throw runtime_error("Invalid address/ Address not supported!");
+    }
+
+	if((connect(fd, (struct sockaddr*) &srv,sizeof(srv)))<0){
+        puts("Timeout when connecting!");
+        throw runtime_error("Timeout when connecting!");
+	}
+	// send command to the server
+	int nbytes;
+
+	if((nbytes=send(fd, cmd.c_str(), cmd.size(), 0))<0){ 
+        puts("Socket write fail!");
+        throw runtime_error("Socket write fail!");
+	}
+    char ret[max_buffer_size];
+    memset(ret, 0, sizeof(ret));
+    if((nbytes=recv(fd, ret, sizeof(ret),0)) < 0){//"read" will block until receive data 
+        puts("TCP message receiver read fail!");
+                    throw runtime_error("TCP message receiver read fail!");
+        }
+        print_to_sdfs_log(ret, true);
+	
+	close(fd);
+}
+
+void file_receiver(){
+    int fd;
+	if((fd=socket(AF_INET,SOCK_STREAM,0))<0){//open a socket
+        puts("File receiver build fail!");
+        throw runtime_error("File receiver build fail!");
+	}
+	struct sockaddr_in srv;
+	srv.sin_family=AF_INET;
+	srv.sin_port=file_receiver_port;
+	srv.sin_addr.s_addr=htonl(INADDR_ANY);
+	if((bind(fd, (struct sockaddr*) &srv,sizeof(srv)))<0){
+		puts("File receiver bind fail!");
+        throw runtime_error("File receiver bind fail!");
+	}
+	if(listen(fd,10)<0) {
+		puts("TCP message receiver listen fail!");
+        throw runtime_error("File receiver listen fail!");
+	}
+	struct sockaddr_in cli;
+	int clifd;
+	socklen_t cli_len = sizeof(cli);
+	
+    while(1){
+		clifd=accept(fd, (struct sockaddr*) &cli, &cli_len);//block until accept connection
+		if(clifd<0){
+			puts("File receiver accept fail!");
+            throw runtime_error("File receiver accept fail!");
+		}
+		int nbytes;
+        char msg[max_buffer_size];
+        memset(msg, 0, sizeof(msg));
+		if((nbytes=recv(clifd, msg, sizeof(msg),0))<0){//"read" will block until receive data 
+			puts("File receiver read fail!");
+            throw runtime_error("File receiver read fail!");
+		}
+
+        string msg_str(msg);
+        string filename = msg_str.substr(1);
+        string ret;
+        print_to_sdfs_log("Received a message: " + msg_str, true);
+        
+        if(msg == "put"){
+
+        }
+        else if(msg == "get"){
+
+        }
+        close(clifd);
+	}
+	close(fd);
+}
 
 void tcp_message_receiver(){
     int fd;
 	if((fd=socket(AF_INET,SOCK_STREAM,0))<0){//open a socket
-		perror("FATAL: socket build fail");
-		exit(1);
+        puts("File receiver build fail!");
+        throw runtime_error("File receiver build fail!");
 	}
 	struct sockaddr_in srv;
 	srv.sin_family=AF_INET;
@@ -87,6 +180,12 @@ void tcp_message_receiver(){
                 break;
             case 'D':
                 master_files_lock.lock();
+                /*if (master_files.find(filename) != master_files.end()){
+                    if(remove(filename.c_str()) != 0){
+                        puts("Master file delete fail!");
+                        throw runtime_error("Master file delete fail!");
+                    }
+                }*/
                 master_files.erase(filename);
                 master_files_lock.unlock();
                 
@@ -100,6 +199,13 @@ void tcp_message_receiver(){
                 break;
             case 'd':
                 slave_files_lock.lock();
+                // TODO: what happens if a localfile has the same name as a sdfsfile
+                /*if (slave_files.find(filename) != slave_files.end()){
+                    if(remove(filename.c_str()) != 0){
+                        puts("Slave file delete fail!");
+                        throw runtime_error("Slave file delete fail!");
+                    }
+                }*/
                 slave_files.erase(filename);
                 slave_files_lock.unlock();
 
@@ -204,6 +310,7 @@ void membership_listener(){
                 for(int x:new_slave_idx)
                     if(!slave_idx_set.count(x))
                         delta_slaves.insert(x);
+                slave_idx_set = new_slave_idx;
                 slave_idx_set_lock.unlock();
                 handle_crash(x, new_membership_set, delta_slaves);
             }
