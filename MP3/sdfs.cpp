@@ -87,9 +87,7 @@ void send_file(string src, string dst, int target_idx, string cmd, bool is_in_sd
             if(readSrcFile.peek() != -1)
                str.push_back(readSrcFile.get());
         }
-        cout << str << endl;
         const char *c_str = str.c_str();
-        cout << c_str << endl;
 
         if((nbytes=send(fd, c_str, strlen(c_str),0))<0){
             throw("FATAL: socket write fail");
