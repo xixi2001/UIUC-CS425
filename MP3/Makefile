@@ -9,5 +9,6 @@ sdfs: membership.cpp sdfs.cpp
 
 clean:
 	rm sdfs *.log
+	rm sdfs_files/*
 
 .PHONY: clean

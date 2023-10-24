@@ -37,7 +37,7 @@ vector<string> tokenize(string input, char delimeter){
 }
 
 // TODO: Probably need to add lock for file
-void send_file(string src, string dst, int target_idx, string cmd){
+void send_file(string src, string dst, int target_idx, string cmd, bool is_in_sdfs_folder){
     string target_ip = get_ip_address_from_index(target_idx);
 	
     int fd;
@@ -73,8 +73,8 @@ void send_file(string src, string dst, int target_idx, string cmd){
         puts("File sender read fail!");
         throw runtime_error("File sender read fail!");
     }
-
-    ifstream readSrcFile(src);
+    src = (is_in_sdfs_folder ? "sdfs_files/":"")+ src;
+    ifstream readSrcFile( src );
     cout << "src: " << src << endl;
     if(!readSrcFile){
         puts("Cannot open source file");
@@ -141,7 +141,7 @@ void file_receiver(){
         print_to_sdfs_log(res, true);
 
         // Start transfering file
-        ofstream dst_file(filename);
+        ofstream dst_file((cmd == 'G' ? "":"sdfs_files/")+filename);
         
         char buf[receive_buffer_size];
         memset(buf, 0, sizeof(buf));
@@ -161,7 +161,7 @@ void file_receiver(){
             
             slave_idx_set_lock.lock();
             for(int slave_idx : slave_idx_set)
-                thread(send_file, filename, filename, slave_idx, "p").detach();
+                thread(send_file, filename, filename, slave_idx, "p", true).detach();
             slave_idx_set_lock.unlock();
             print_to_sdfs_log("Get master file: " + filename, true);
         }
@@ -260,7 +260,7 @@ void tcp_message_receiver(){
                     ret = "File doesn't exist!";
                 else{
                     ret = "File exists!";
-                    thread(send_file, info[0], info[1], stoi(info[2]), "G").detach();
+                    thread(send_file, info[0], info[1], stoi(info[2]), "G", true).detach();
                 }
 
                 print_to_sdfs_log("Requst " + filename + ": " + ret, true);
@@ -443,7 +443,7 @@ void handle_crash(int crash_idx, const set<int> &new_membership_set, const set<i
                     print_to_sdfs_log("Start sending new master files to all the slaves", true);
                     for(int slave_id : slave_idx_set){
                         print_to_sdfs_log("Start sending new master files to one slave " + to_string(slave_id), true);
-                        thread(send_file, slave_file, slave_file, slave_id, "p").detach();
+                        thread(send_file, slave_file, slave_file, slave_id, "p", true).detach();
                     }
                     slave_idx_set_lock.unlock();
                 }
@@ -459,7 +459,7 @@ void handle_crash(int crash_idx, const set<int> &new_membership_set, const set<i
     for(int slave: delta_slaves){
         master_files_lock.lock();
         for(string master_file : master_files){
-            thread(send_file, master_file, master_file, slave, "p").detach();
+            thread(send_file, master_file, master_file, slave, "p", true).detach();
         }
         master_files_lock.unlock();
     }
@@ -474,7 +474,7 @@ void handle_join(int join_idx, const set<int> &new_membership_set, const set<int
         master_files_lock.lock();
         for(string master_file : master_files){
             if(find_master(new_membership_set, hash_string(master_file)) == join_idx){
-                thread(send_file, master_file, master_file, join_idx, "P").detach();
+                thread(send_file, master_file, master_file, join_idx, "P", true).detach();
                 master_file_to_delete.push_back(master_file);
             }
         }
@@ -488,7 +488,7 @@ void handle_join(int join_idx, const set<int> &new_membership_set, const set<int
     master_files_lock.lock();
     if(new_slaves.find(join_idx) != new_slaves.end()){
         for(string master_file : master_files)
-            thread(send_file, master_file, master_file, join_idx, "p").detach();
+            thread(send_file, master_file, master_file, join_idx, "p", true).detach();
     }
     master_files_lock.unlock();
 
@@ -561,7 +561,7 @@ int main(int argc, char *argv[]){
         } else if(input == "Put" || input == "put" || input == "P" || input == "p") {
             string localfilename;cin>>localfilename;
             string sdfsfilename;cin>>sdfsfilename;
-            send_file(localfilename, sdfsfilename, find_master(membership_set, hash_string(sdfsfilename)), "P");
+            send_file(localfilename, sdfsfilename, find_master(membership_set, hash_string(sdfsfilename)), "P", false);
         } else if(input == "Delete" || input == "delete" || input == "D" || input == "d") {
             string name;cin>>name;
             send_a_tcp_message("D"+name, find_master(membership_set, hash_string(name)));
