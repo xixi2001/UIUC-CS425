@@ -80,11 +80,20 @@ void send_file(string src, string dst, int target_idx, string cmd, bool is_in_sd
         puts("Cannot open source file");
         throw runtime_error("Cannot open source file");
 	}
-    string str((istreambuf_iterator<char>(readSrcFile)), istreambuf_iterator<char>());
-    const char *c_str = str.c_str();
+    
+    while(readSrcFile.good()){
+        string str;
+        while(str.length() < max_buffer_size/2 && readSrcFile.good()){
+            if(readSrcFile.peek() != -1)
+               str.push_back(readSrcFile.get());
+        }
+        cout << str << endl;
+        const char *c_str = str.c_str();
+        cout << c_str << endl;
 
-    if((nbytes=send(fd, c_str, strlen(c_str),0))<0){
-        throw("FATAL: socket write fail");
+        if((nbytes=send(fd, c_str, strlen(c_str),0))<0){
+            throw("FATAL: socket write fail");
+        }
     }
 
 	close(fd);
