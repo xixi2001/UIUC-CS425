@@ -66,6 +66,14 @@ void send_file(string src, string dst, int target_idx, string cmd){
         throw runtime_error("Socket write fail!");
 	}
 
+    char ret[max_buffer_size];
+    memset(ret, 0, sizeof(ret));
+    if((nbytes=recv(fd, ret, sizeof(ret),0)) < 0){
+        puts("File sender read fail!");
+        throw runtime_error("File sender read fail!");
+    }
+    print_to_sdfs_log(ret, true);
+
     ifstream readSrcFile(src);
     if(readSrcFile){
 		perror("Cannot open source file");
@@ -118,9 +126,16 @@ void file_receiver(){
             throw runtime_error("File receiver read fail!");
 		}
 
+
         string msg_str(msg);
         char cmd = msg_str[0];
         string filename = msg_str.substr(1);
+
+        string res = cmd + " Confirm";
+	    if((nbytes=send(fd, res.c_str(), res.size(), 0))<0){ 
+            puts("Socket write fail!");
+            throw runtime_error("Socket write fail!");
+	    }
 
         // Start transfering file
         ofstream dst_file(filename);
