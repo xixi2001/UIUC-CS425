@@ -23,7 +23,7 @@ set<int> slave_idx_set;
 constexpr int max_buffer_size = 1024;
 constexpr int listen_port = 1022;
 constexpr int file_receiver_port = 1020;
-constexpr int receive_buffer_size = 5e6;
+constexpr int receive_buffer_size = 1024;
 
 vector<string> tokenize(string input, char delimeter){
     istringstream ss(input);
@@ -73,11 +73,10 @@ void send_file(string src, string dst, int target_idx, string cmd){
         puts("File sender read fail!");
         throw runtime_error("File sender read fail!");
     }
-    print_to_sdfs_log("Line 75", true);
-    print_to_sdfs_log(ret, true);
 
     ifstream readSrcFile(src);
-    if(readSrcFile){
+    cout << "src: " << src << endl;
+    if(!readSrcFile){
         puts("Cannot open source file");
         throw runtime_error("Cannot open source file");
 	}
@@ -130,11 +129,11 @@ void file_receiver(){
 		}
 
 
-        string msg_str(msg);
+        string msg_str = (string)msg;
         char cmd = msg_str[0];
         string filename = msg_str.substr(1);
 
-        string res = cmd + " Confirm";
+        string res = ""; res.append(1, cmd); res += " Confirm";
 	    if((nbytes=send(clifd, res.c_str(), res.size(), 0))<0){ 
             puts("Socket write fail!");
             throw runtime_error("Socket write fail!");
@@ -562,7 +561,7 @@ int main(int argc, char *argv[]){
         } else if(input == "Put" || input == "put" || input == "P" || input == "p") {
             string localfilename;cin>>localfilename;
             string sdfsfilename;cin>>sdfsfilename;
-            send_file(localfilename, sdfsfilename, hash_string(sdfsfilename), "P");
+            send_file(localfilename, sdfsfilename, find_master(membership_set, hash_string(sdfsfilename)), "P");
         } else if(input == "Delete" || input == "delete" || input == "D" || input == "d") {
             string name;cin>>name;
             send_a_tcp_message("D"+name, find_master(membership_set, hash_string(name)));
