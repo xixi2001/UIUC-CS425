@@ -36,6 +36,7 @@ vector<string> tokenize(string input, char delimeter){
     return ret;
 }
 
+// TODO: Probably need to add lock for file
 void send_file(string src, string dst, int target_idx, string cmd){
     string target_ip = get_ip_address_from_index(target_idx);
 	
@@ -46,7 +47,7 @@ void send_file(string src, string dst, int target_idx, string cmd){
 	}
 	struct sockaddr_in srv;
 	srv.sin_family=AF_INET;
-	srv.sin_port=1020;
+	srv.sin_port=file_receiver_port;
 
     if (inet_pton(AF_INET, target_ip.c_str(), &srv.sin_addr) <= 0) {
         puts("Invalid address/ Address not supported!");
@@ -136,10 +137,21 @@ void file_receiver(){
         close(clifd);
 
         if(cmd == 'P'){
+            master_files_lock.lock();
+            master_files.insert(filename);
+            master_files_lock.unlock();
+            
             slave_idx_set_lock.lock();
             for(int slave_idx : slave_idx_set)
                 thread(send_file, filename, filename, slave_idx, "p").detach();
             slave_idx_set_lock.unlock();
+            print_to_sdfs_log("Get master file: " + filename, true);
+        }
+        else if(cmd == 'p'){
+            slave_files_lock.lock();
+            slave_files.insert(filename);
+            slave_files_lock.unlock();
+            print_to_sdfs_log("Get slave file: " + filename, true);
         }
 	}
 	close(fd);
@@ -413,7 +425,7 @@ void handle_crash(int crash_idx, const set<int> &new_membership_set, const set<i
                     print_to_sdfs_log("Start sending new master files to all the slaves", true);
                     for(int slave_id : slave_idx_set){
                         print_to_sdfs_log("Start sending new master files to one slave " + to_string(slave_id), true);
-                        thread(send_a_tcp_message, "p" + slave_file, slave_id).detach();
+                        thread(send_file, slave_file, slave_file, slave_id, "p").detach();
                     }
                     slave_idx_set_lock.unlock();
                 }
@@ -429,7 +441,7 @@ void handle_crash(int crash_idx, const set<int> &new_membership_set, const set<i
     for(int slave: delta_slaves){
         master_files_lock.lock();
         for(string master_file : master_files){
-            thread(send_a_tcp_message, "p" + master_file, slave).detach();
+            thread(send_file, master_file, master_file, slave, "p").detach();
         }
         master_files_lock.unlock();
     }
@@ -444,20 +456,21 @@ void handle_join(int join_idx, const set<int> &new_membership_set, const set<int
         master_files_lock.lock();
         for(string master_file : master_files){
             if(find_master(new_membership_set, hash_string(master_file)) == join_idx){
-                thread(send_a_tcp_message, "P" + master_file, join_idx).detach();
+                thread(send_file, master_file, master_file, join_idx, "P").detach();
                 master_file_to_delete.push_back(master_file);
             }
         }
         
-        for(string filename : master_file_to_delete)
-            master_files.erase(filename); 
+        for(string filename : master_file_to_delete){
+            master_files.erase(filename);
+        }
         master_files_lock.unlock();
     }
     
     master_files_lock.lock();
     if(new_slaves.find(join_idx) != new_slaves.end()){
         for(string master_file : master_files)
-            thread(send_a_tcp_message, "p" + master_file, join_idx).detach();
+            thread(send_file, master_file, master_file, join_idx, "p").detach();
     }
     master_files_lock.unlock();
 
@@ -469,8 +482,10 @@ void handle_join(int join_idx, const set<int> &new_membership_set, const set<int
                 == new_masters.end())
             slave_file_to_delete.push_back(slave_file);
     }
-    for(string filename : slave_file_to_delete)
+    for(string filename : slave_file_to_delete){
         slave_files.erase(filename);
+        remove(filename.c_str());
+    }
     slave_files_lock.unlock();
 }
 
@@ -516,6 +531,7 @@ int main(int argc, char *argv[]){
     start_membership_service(get_ip_address_from_index(machine_idx));
     thread(tcp_message_receiver).detach();
     thread(membership_listener).detach();
+    thread(file_receiver).detach();
     
     string input;
     while(cin>>input){
