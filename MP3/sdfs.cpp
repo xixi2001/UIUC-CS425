@@ -20,6 +20,9 @@ set<string> slave_files;  // files save as slave;string is file name; int is has
 mutex slave_idx_set_lock;
 set<int> slave_idx_set;
 
+unsigned long long cur_event_num = 0, finish_event_num = 0, last_write_num = 0;
+mutex cur_event_num_lock, finish_event_num_lock, last_write_num_lock;
+
 constexpr int max_buffer_size = 1024;
 constexpr int listen_port = 1022;
 constexpr int file_receiver_port = 1020;
@@ -36,8 +39,114 @@ vector<string> tokenize(string input, char delimeter){
     return ret;
 }
 
-// TODO: Probably need to add lock for file
+unsigned long long read_lock() {
+    cur_event_num_lock.lock();
+    auto event_num = ++cur_event_num;
+    cur_event_num_lock.unlock();
+    last_write_num_lock.lock();
+    auto last_write = last_write_num;
+    last_write_num_lock.unlock();
+    cout << "send file: " << " event: " << event_num << " last write: " << last_write << endl;
+    
+    while(true){// block before previous write is finished
+        finish_event_num_lock.lock();
+        auto finish_num = finish_event_num;
+        finish_event_num_lock.unlock();
+        stringstream ss;
+        ss << "send file: " << " event: " << event_num << " last write: " << last_write << " cur finished: " << finish_num << endl;
+        print_to_sdfs_log(ss.str(), false);
+        if(finish_num >= last_write) break; 
+    }
+    return event_num;
+}
+
+unsigned long long write_lock() {
+    cur_event_num_lock.lock();
+    auto event_num = ++cur_event_num;
+    cur_event_num_lock.unlock();
+    last_write_num_lock.lock();
+    last_write_num = event_num;
+    last_write_num_lock.unlock();
+    cout << "receive file: " << " event: " << event_num << endl;
+
+    while(true){// block before previous event is finished
+        finish_event_num_lock.lock();
+        auto finish_num = finish_event_num;
+        finish_event_num_lock.unlock();
+        stringstream ss;
+        ss << "receive file: " << " event: " << event_num << " cur finished: " << finish_num << endl;
+        print_to_sdfs_log(ss.str(), false);
+        if(finish_num + 1 == event_num) break; 
+    }
+    return event_num;
+}
+
+void update_finish_event(unsigned long long event_num){
+    finish_event_num_lock.lock();
+    finish_event_num = max(finish_event_num, event_num);
+    finish_event_num_lock.unlock();
+}
+
+void post_receive_a_file(const char cmd,const string& filename){
+    if(cmd == 'P'){
+        master_files_lock.lock();
+        master_files.insert(filename);
+        master_files_lock.unlock();
+        
+        slave_idx_set_lock.lock();
+        for(int slave_idx : slave_idx_set)
+            thread(send_file, filename, filename, slave_idx, "p", true).detach();
+        slave_idx_set_lock.unlock();
+        print_to_sdfs_log("Get master file: " + filename, true);
+    }
+    else if(cmd == 'p'){
+        slave_files_lock.lock();
+        slave_files.insert(filename);
+        slave_files_lock.unlock();
+        print_to_sdfs_log("Get slave file: " + filename, true);
+    }
+
+}
+
+void local_file_copy(const string src, const string dst, const char cmd) {
+    auto event_num = write_lock();
+    print_to_sdfs_log("local copy from " +src + " to " + dst , true);
+    ifstream readSrcFile( src );
+    if(!readSrcFile){
+        cout << "[ERROR] Cannot open source file:" << src;
+        return;
+	}
+    ofstream dst_file((cmd == 'G' ? "":"sdfs_files/") + dst);
+    
+    while(readSrcFile.good()){
+        string str;
+        while(str.length() < max_buffer_size/2 && readSrcFile.good()){
+            if(readSrcFile.peek() != -1)
+               str.push_back(readSrcFile.get());
+        }
+        const char *c_str = str.c_str();
+
+        dst_file << c_str;
+    }
+    dst_file.close();
+    readSrcFile.close();
+
+    post_receive_a_file(cmd, dst);
+
+    update_finish_event(event_num);
+}
+
 void send_file(string src, string dst, int target_idx, string cmd, bool is_in_sdfs_folder){
+    if(target_idx == machine_idx) {
+        local_file_copy((is_in_sdfs_folder ? "sdfs_files/":"")+src, dst, cmd[0]);
+        return;
+    }
+    print_to_sdfs_log("Send a file to " + to_string(target_idx) + " file: " +(is_in_sdfs_folder ? "sdfs_files/":"") + src, true);
+
+    auto event_num = read_lock();
+
+    print_to_sdfs_log("Ready to send file: " + src, true);
+
     string target_ip = get_ip_address_from_index(target_idx);
 	
     int fd;
@@ -75,10 +184,9 @@ void send_file(string src, string dst, int target_idx, string cmd, bool is_in_sd
     }
     src = (is_in_sdfs_folder ? "sdfs_files/":"")+ src;
     ifstream readSrcFile( src );
-    cout << "src: " << src << endl;
     if(!readSrcFile){
-        puts("Cannot open source file");
-        throw runtime_error("Cannot open source file");
+        cout << "[ERROR] Cannot open source file:" << src;
+        return;
 	}
     
     while(readSrcFile.good()){
@@ -95,6 +203,55 @@ void send_file(string src, string dst, int target_idx, string cmd, bool is_in_sd
     }
 
 	close(fd);
+
+    update_finish_event(event_num);
+}
+
+void receive_a_file(int clifd){
+    auto event_num = write_lock();
+    if(clifd<0){
+		puts("File receiver accept fail!");
+        throw runtime_error("File receiver accept fail!");
+	}
+
+    // Receive intial message including command and filename 
+    int nbytes;
+    char msg[max_buffer_size];
+    memset(msg, 0, sizeof(msg));
+    if((nbytes=recv(clifd, msg, sizeof(msg),0))<0){
+        puts("File receiver read fail!");
+        throw runtime_error("File receiver read fail!");
+    }
+
+
+    string msg_str = (string)msg;
+    char cmd = msg_str[0];
+    string filename = msg_str.substr(1);
+
+    string res = ""; res.append(1, cmd); res += " Confirm";
+    if((nbytes=send(clifd, res.c_str(), res.size(), 0))<0){ 
+        puts("Socket write fail!");
+        throw runtime_error("Socket write fail!");
+    }
+    print_to_sdfs_log(res, true);
+
+    // Start transfering file
+    ofstream dst_file((cmd == 'G' ? "":"sdfs_files/")+filename);
+    
+    char buf[receive_buffer_size];
+    memset(buf, 0, sizeof(buf));
+
+    while(read(clifd, buf, sizeof(buf))) {
+        dst_file << buf;
+        memset(buf, 0, sizeof(buf));
+    }
+    dst_file.close();
+
+    close(clifd);
+
+    post_receive_a_file(cmd, filename);
+
+    update_finish_event(event_num);
 }
 
 void file_receiver(){
@@ -121,63 +278,7 @@ void file_receiver(){
 	
     while(1){
 		clifd=accept(fd, (struct sockaddr*) &cli, &cli_len);//block until accept connection
-		if(clifd<0){
-			puts("File receiver accept fail!");
-            throw runtime_error("File receiver accept fail!");
-		}
-
-        // Receive intial message including command and filename 
-		int nbytes;
-        char msg[max_buffer_size];
-        memset(msg, 0, sizeof(msg));
-		if((nbytes=recv(clifd, msg, sizeof(msg),0))<0){
-			puts("File receiver read fail!");
-            throw runtime_error("File receiver read fail!");
-		}
-
-
-        string msg_str = (string)msg;
-        char cmd = msg_str[0];
-        string filename = msg_str.substr(1);
-
-        string res = ""; res.append(1, cmd); res += " Confirm";
-	    if((nbytes=send(clifd, res.c_str(), res.size(), 0))<0){ 
-            puts("Socket write fail!");
-            throw runtime_error("Socket write fail!");
-	    }
-        print_to_sdfs_log(res, true);
-
-        // Start transfering file
-        ofstream dst_file((cmd == 'G' ? "":"sdfs_files/")+filename);
-        
-        char buf[receive_buffer_size];
-        memset(buf, 0, sizeof(buf));
-
-        while(read(clifd, buf, sizeof(buf))) {
-            dst_file << buf;
-            memset(buf, 0, sizeof(buf));
-        }
-        dst_file.close();
-
-        close(clifd);
-
-        if(cmd == 'P'){
-            master_files_lock.lock();
-            master_files.insert(filename);
-            master_files_lock.unlock();
-            
-            slave_idx_set_lock.lock();
-            for(int slave_idx : slave_idx_set)
-                thread(send_file, filename, filename, slave_idx, "p", true).detach();
-            slave_idx_set_lock.unlock();
-            print_to_sdfs_log("Get master file: " + filename, true);
-        }
-        else if(cmd == 'p'){
-            slave_files_lock.lock();
-            slave_files.insert(filename);
-            slave_files_lock.unlock();
-            print_to_sdfs_log("Get slave file: " + filename, true);
-        }
+		thread(receive_a_file, clifd).detach();
 	}
 	close(fd);
 }

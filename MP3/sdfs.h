@@ -31,6 +31,8 @@ while receive a message:
 
 void send_a_tcp_message(const string& str, int target_index);
 
+void send_file(string src, string dst, int target_idx, string cmd, bool is_in_sdfs_folder);
+
 void membership_listener();
 
 set<int> get_new_slave_idx_set(const set<int> &membership_set);
