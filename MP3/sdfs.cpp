@@ -9,7 +9,9 @@
 #include <iostream>
 #include <fstream>
 #include <cstdio>
+#include <filesystem>
 using namespace std;
+// namespace fs = std::filesystem;
 
 int machine_idx;
 
@@ -84,6 +86,8 @@ unsigned long long write_lock() {
 void update_finish_event(unsigned long long event_num){
     finish_event_num_lock.lock();
     finish_event_num = max(finish_event_num, event_num);
+    print_to_sdfs_log("Update finish event num to: " + to_string(finish_event_num) 
+        + " cur event num: " + to_string(event_num), false);
     finish_event_num_lock.unlock();
 }
 
@@ -109,13 +113,13 @@ void post_receive_a_file(const char cmd,const string& filename){
 }
 
 void local_file_copy(const string src, const string dst, const char cmd) {
-    auto event_num = write_lock();
     print_to_sdfs_log("local copy from " +src + " to " + dst , true);
     ifstream readSrcFile( src );
     if(!readSrcFile){
         cout << "[ERROR] Cannot open source file:" << src;
         return;
 	}
+    auto event_num = write_lock();
     ofstream dst_file((cmd == 'G' ? "":"sdfs_files/") + dst);
     
     while(readSrcFile.good()){
@@ -143,42 +147,41 @@ void send_file(string src, string dst, int target_idx, string cmd, bool is_in_sd
     }
     print_to_sdfs_log("Send a file to " + to_string(target_idx + 1) + " file: " +(is_in_sdfs_folder ? "sdfs_files/":"") + src, true);
 
-    auto event_num = read_lock();
 
     string target_ip = get_ip_address_from_index(target_idx);
 	
     int fd;
 	if((fd=socket(AF_INET,SOCK_STREAM,0))<0){//create a socket
-		puts("File sender build fail!");
-        throw runtime_error("File sender build fail!");
+		puts("[ERROR] File sender build fail!");
+        return;
 	}
 	struct sockaddr_in srv;
 	srv.sin_family=AF_INET;
 	srv.sin_port=file_receiver_port;
 
     if (inet_pton(AF_INET, target_ip.c_str(), &srv.sin_addr) <= 0) {
-        puts("Invalid address/ Address not supported!");
-        throw runtime_error("Invalid address/ Address not supported!");
+        puts("[ERROR] Invalid address/ Address not supported!");
+        return;
     }
 
 	if((connect(fd, (struct sockaddr*) &srv,sizeof(srv)))<0){
-        puts("Timeout when connecting!");
-        throw runtime_error("Timeout when connecting!");
+        puts("[ERROR] Timeout when connecting!");
+        return;
 	}
 
     string info = cmd + dst;
     int nbytes;
 	if((nbytes=send(fd, info.c_str(), info.size(), 0))<0){ 
-        puts("Socket write fail!");
-        throw runtime_error("Socket write fail!");
+        puts("[ERROR] Socket write fail!");
+        return;
 	}
     print_to_sdfs_log(info, true);
 
     char ret[max_buffer_size];
     memset(ret, 0, sizeof(ret));
     if((nbytes=recv(fd, ret, sizeof(ret),0)) < 0){
-        puts("File sender read fail!");
-        throw runtime_error("File sender read fail!");
+        puts("[ERROR] File sender read fail!");
+        return;
     }
     src = (is_in_sdfs_folder ? "sdfs_files/":"")+ src;
     ifstream readSrcFile( src );
@@ -186,6 +189,8 @@ void send_file(string src, string dst, int target_idx, string cmd, bool is_in_sd
         cout << "[ERROR] Cannot open source file:" << src;
         return;
 	}
+
+    auto event_num = read_lock();
     
     while(readSrcFile.good()){
         string str;
@@ -196,7 +201,8 @@ void send_file(string src, string dst, int target_idx, string cmd, bool is_in_sd
         const char *c_str = str.c_str();
 
         if((nbytes=send(fd, c_str, strlen(c_str),0))<0){
-            throw("FATAL: socket write fail");
+            puts("FATAL: socket write fail");
+            break;
         }
     }
 
@@ -206,10 +212,10 @@ void send_file(string src, string dst, int target_idx, string cmd, bool is_in_sd
 }
 
 void receive_a_file(int clifd){
-    auto event_num = write_lock();
+    
     if(clifd<0){
-		puts("File receiver accept fail!");
-        throw runtime_error("File receiver accept fail!");
+		puts("[ERROR] File receiver accept fail!");
+        return;
 	}
 
     // Receive intial message including command and filename 
@@ -217,10 +223,9 @@ void receive_a_file(int clifd){
     char msg[max_buffer_size];
     memset(msg, 0, sizeof(msg));
     if((nbytes=recv(clifd, msg, sizeof(msg),0))<0){
-        puts("File receiver read fail!");
-        throw runtime_error("File receiver read fail!");
+        puts("[ERROR] File receiver read fail!");
+        return;
     }
-
 
     string msg_str = (string)msg;
     char cmd = msg_str[0];
@@ -228,10 +233,12 @@ void receive_a_file(int clifd){
 
     string res = ""; res.append(1, cmd); res += " Confirm";
     if((nbytes=send(clifd, res.c_str(), res.size(), 0))<0){ 
-        puts("Socket write fail!");
-        throw runtime_error("Socket write fail!");
+        puts("[ERROR] Socket write fail!");
+        return;
     }
     print_to_sdfs_log(res, true);
+
+   auto event_num = write_lock();
 
     // Start transfering file
     ofstream dst_file((cmd == 'G' ? "":"sdfs_files/")+filename);
@@ -404,35 +411,35 @@ void send_a_tcp_message(const string& str, int target_index){
 	print_to_sdfs_log("Send a message to " + to_string(target_index+1) + ": " + str, true);
     int fd;
 	if((fd=socket(AF_INET,SOCK_STREAM,0))<0){//create a socket
-		puts("TCP message sender build fail!");
-        throw runtime_error("TCP message sender build fail!");
+		puts("[Error] TCP message sender build fail!");
+        return;
 	}
 	struct sockaddr_in srv;
 	srv.sin_family=AF_INET;
 	srv.sin_port=listen_port;
 
     if (inet_pton(AF_INET, target_ip.c_str(), &srv.sin_addr) <= 0) {
-        puts("Invalid address/ Address not supported!");
-        throw runtime_error("Invalid address/ Address not supported!");
+        puts("[Error] Invalid address/ Address not supported!");
+        return;
     }
 
 	if((connect(fd, (struct sockaddr*) &srv,sizeof(srv)))<0){
-        puts("Timeout when connecting!");
-        throw runtime_error("Timeout when connecting!");
+        puts("[Error] Timeout when connecting!");
+        return;
 	}
 	// send command to the server
 	int nbytes;
 
 	if((nbytes=send(fd, str.c_str(), str.size(), 0))<0){ 
-        puts("Socket write fail!");
-        throw runtime_error("Socket write fail!");
+        puts("[Error] Socket write fail!");
+        return;
 	}
     char ret[max_buffer_size];
     memset(ret, 0, sizeof(ret));
     if(str[0]== 'G'){
         if((nbytes=recv(fd, ret, sizeof(ret),0)) < 0){//"read" will block until receive data 
-        puts("TCP message receiver read fail!");
-                    throw runtime_error("TCP message receiver read fail!");
+            puts("[Error] TCP message receiver read fail!");
+            return;
         }
     }
 	
@@ -642,8 +649,14 @@ void print_current_files(){
     slave_files_lock.unlock();
 }
 
+void deleteDirectoryContents(const std::filesystem::path& dir){
+    for (const auto& entry : std::filesystem::directory_iterator(dir)) 
+        std::filesystem::remove_all(entry.path());
+}
+
 int main(int argc, char *argv[]){
     init_ip_list();
+    deleteDirectoryContents("./sdfs_files/");
     if(argc != 2){
         puts("FATAL: please assign machine index!");
         exit(0);
