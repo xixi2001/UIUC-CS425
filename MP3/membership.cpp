@@ -676,7 +676,6 @@ void save_current_status_to_log() {
 }
 
 void start_membership_service(string ip){
-    cout << ip << endl;
     srand(time(NULL));
     machine_id.first = ip;
     machine_id.second = cur_time_in_ms();

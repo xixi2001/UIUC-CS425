@@ -46,7 +46,7 @@ unsigned long long read_lock() {
     last_write_num_lock.lock();
     auto last_write = last_write_num;
     last_write_num_lock.unlock();
-    cout << "send file: " << " event: " << event_num << " last write: " << last_write << endl;
+    // cout << "send file: " << " event: " << event_num << " last write: " << last_write << endl;
     
     while(true){// block before previous write is finished
         finish_event_num_lock.lock();
@@ -67,7 +67,7 @@ unsigned long long write_lock() {
     last_write_num_lock.lock();
     last_write_num = event_num;
     last_write_num_lock.unlock();
-    cout << "receive file: " << " event: " << event_num << endl;
+    // cout << "receive file: " << " event: " << event_num << endl;
 
     while(true){// block before previous event is finished
         finish_event_num_lock.lock();
@@ -141,11 +141,9 @@ void send_file(string src, string dst, int target_idx, string cmd, bool is_in_sd
         local_file_copy((is_in_sdfs_folder ? "sdfs_files/":"")+src, dst, cmd[0]);
         return;
     }
-    print_to_sdfs_log("Send a file to " + to_string(target_idx) + " file: " +(is_in_sdfs_folder ? "sdfs_files/":"") + src, true);
+    print_to_sdfs_log("Send a file to " + to_string(target_idx + 1) + " file: " +(is_in_sdfs_folder ? "sdfs_files/":"") + src, true);
 
     auto event_num = read_lock();
-
-    print_to_sdfs_log("Ready to send file: " + src, true);
 
     string target_ip = get_ip_address_from_index(target_idx);
 	
@@ -436,7 +434,6 @@ void send_a_tcp_message(const string& str, int target_index){
         puts("TCP message receiver read fail!");
                     throw runtime_error("TCP message receiver read fail!");
         }
-        print_to_sdfs_log(ret, true);
     }
 	
 	close(fd);
