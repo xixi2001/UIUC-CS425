@@ -145,6 +145,12 @@ void send_file(string src, string dst, int target_idx, string cmd, bool is_in_sd
         local_file_copy((is_in_sdfs_folder ? "sdfs_files/":"")+src, dst, cmd[0]);
         return;
     }
+    src = (is_in_sdfs_folder ? "sdfs_files/":"")+ src;
+    ifstream readSrcFile( src );
+    if(!readSrcFile){
+        cout << "[ERROR] Cannot open source file:" << src;
+        return;
+	}
     print_to_sdfs_log("Send a file to " + to_string(target_idx + 1) + " file: " +(is_in_sdfs_folder ? "sdfs_files/":"") + src, true);
 
 
@@ -183,12 +189,6 @@ void send_file(string src, string dst, int target_idx, string cmd, bool is_in_sd
         puts("[ERROR] File sender read fail!");
         return;
     }
-    src = (is_in_sdfs_folder ? "sdfs_files/":"")+ src;
-    ifstream readSrcFile( src );
-    if(!readSrcFile){
-        cout << "[ERROR] Cannot open source file:" << src;
-        return;
-	}
 
     auto event_num = read_lock();
     
@@ -238,7 +238,7 @@ void receive_a_file(int clifd){
     }
     print_to_sdfs_log(res, true);
 
-   auto event_num = write_lock();
+    auto event_num = write_lock();
 
     // Start transfering file
     ofstream dst_file((cmd == 'G' ? "":"sdfs_files/")+filename);
