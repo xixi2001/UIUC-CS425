@@ -337,10 +337,13 @@ void tcp_message_receiver(){
             case 'D':
                 master_files_lock.lock();
                 if (master_files.find(filename) != master_files.end()){
-                    if(remove(filename.c_str()) != 0){
+                    if(remove(("./sdfs_files/" + filename).c_str()) != 0){
                         puts("Master file delete fail!");
                         throw runtime_error("Master file delete fail!");
                     }
+                }
+                else{
+                    cout << filename << " not exist" << endl;
                 }
                 master_files.erase(filename);
                 master_files_lock.unlock();
@@ -357,10 +360,13 @@ void tcp_message_receiver(){
                 slave_files_lock.lock();
                 // TODO: what happens if a localfile has the same name as a sdfsfile
                 if (slave_files.find(filename) != slave_files.end()){
-                    if(remove(filename.c_str()) != 0){
+                    if(remove(("./sdfs_files/" + filename).c_str()) != 0){
                         puts("Slave file delete fail!");
                         throw runtime_error("Slave file delete fail!");
                     }
+                }
+                else{
+                    cout << filename << " not exist" << endl;
                 }
                 slave_files.erase(filename);
                 slave_files_lock.unlock();
