@@ -23,7 +23,8 @@ mutex slave_idx_set_lock;
 set<int> slave_idx_set;
 
 unsigned long long cur_event_num = 0, finish_event_num = 0, last_write_num = 0;
-mutex cur_event_num_lock, finish_event_num_lock, last_write_num_lock;
+set<unsigned long long> unfinished_events;
+mutex event_num_lock;
 
 constexpr int max_buffer_size = 1024;
 constexpr int listen_port = 1022;
@@ -42,18 +43,17 @@ vector<string> tokenize(string input, char delimeter){
 }
 
 unsigned long long read_lock() {
-    cur_event_num_lock.lock();
+    event_num_lock.lock();
     auto event_num = ++cur_event_num;
-    cur_event_num_lock.unlock();
-    last_write_num_lock.lock();
+    unfinished_events.insert(event_num);
     auto last_write = last_write_num;
-    last_write_num_lock.unlock();
+    event_num_lock.unlock();
     // cout << "send file: " << " event: " << event_num << " last write: " << last_write << endl;
     
     while(true){// block before previous write is finished
-        finish_event_num_lock.lock();
+        event_num_lock.lock();
         auto finish_num = finish_event_num;
-        finish_event_num_lock.unlock();
+        event_num_lock.unlock();
         stringstream ss;
         ss << "send file: " << " event: " << event_num << " last write: " << last_write << " cur finished: " << finish_num << endl;
         print_to_sdfs_log(ss.str(), false);
@@ -63,18 +63,17 @@ unsigned long long read_lock() {
 }
 
 unsigned long long write_lock() {
-    cur_event_num_lock.lock();
+    event_num_lock.lock();
     auto event_num = ++cur_event_num;
-    cur_event_num_lock.unlock();
-    last_write_num_lock.lock();
+    unfinished_events.insert(event_num);
     last_write_num = event_num;
-    last_write_num_lock.unlock();
+    event_num_lock.unlock();
     // cout << "receive file: " << " event: " << event_num << endl;
 
     while(true){// block before previous event is finished
-        finish_event_num_lock.lock();
+        event_num_lock.lock();
         auto finish_num = finish_event_num;
-        finish_event_num_lock.unlock();
+        event_num_lock.unlock();
         stringstream ss;
         ss << "receive file: " << " event: " << event_num << " cur finished: " << finish_num << endl;
         print_to_sdfs_log(ss.str(), false);
@@ -84,11 +83,17 @@ unsigned long long write_lock() {
 }
 
 void update_finish_event(unsigned long long event_num){
-    finish_event_num_lock.lock();
+    event_num_lock.lock();
+    unfinished_events.erase(event_num);
+    if(unfinished_events.empty()){
+        finish_event_num = cur_event_num - 1; 
+    } else {
+        finish_event_num = *(unfinished_events.rbegin()) - 1;
+    }
     finish_event_num = max(finish_event_num, event_num);
     print_to_sdfs_log("Update finish event num to: " + to_string(finish_event_num) 
-        + " cur event num: " + to_string(event_num), false);
-    finish_event_num_lock.unlock();
+        + " finsied event num: " + to_string(event_num), false);
+    event_num_lock.unlock();
 }
 
 void post_receive_a_file(const char cmd,const string& filename){
