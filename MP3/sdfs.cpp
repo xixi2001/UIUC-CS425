@@ -257,6 +257,7 @@ void receive_a_file(int clifd){
     post_receive_a_file(cmd, filename);
 
     update_finish_event(event_num);
+    cout << "Put command end: " << cur_time_in_ms() << endl;
 }
 
 void file_receiver(){
@@ -685,6 +686,7 @@ int main(int argc, char *argv[]){
         } else if(input == "Put" || input == "put" || input == "P" || input == "p") {
             string localfilename;cin>>localfilename;
             string sdfsfilename;cin>>sdfsfilename;
+            cout << "Put command start: " << cur_time_in_ms() << endl;
             send_file(localfilename, sdfsfilename, find_master(membership_set, hash_string(sdfsfilename)), "P", false);
         } else if(input == "Delete" || input == "delete" || input == "D" || input == "d") {
             string name;cin>>name;
