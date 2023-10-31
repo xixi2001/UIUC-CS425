@@ -90,7 +90,6 @@ void update_finish_event(unsigned long long event_num){
     } else {
         finish_event_num = *(unfinished_events.rbegin()) - 1;
     }
-    finish_event_num = max(finish_event_num, event_num);
     print_to_sdfs_log("Update finish event num to: " + to_string(finish_event_num) 
         + " finsied event num: " + to_string(event_num), false);
     event_num_lock.unlock();
