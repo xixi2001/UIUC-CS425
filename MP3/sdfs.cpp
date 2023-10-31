@@ -86,12 +86,18 @@ void update_finish_event(unsigned long long event_num){
     event_num_lock.lock();
     unfinished_events.erase(event_num);
     if(unfinished_events.empty()){
-        finish_event_num = cur_event_num - 1; 
+        finish_event_num = cur_event_num; 
     } else {
         finish_event_num = *(unfinished_events.rbegin()) - 1;
     }
+    stringstream ss;
+    ss << "unfinished events: ";
+    for(auto x:unfinished_events)
+        ss << x << " ";
+    ss << endl;
     print_to_sdfs_log("Update finish event num to: " + to_string(finish_event_num) 
         + " finsied event num: " + to_string(event_num), false);
+    print_to_sdfs_log(ss.str(), false);
     event_num_lock.unlock();
 }
 
