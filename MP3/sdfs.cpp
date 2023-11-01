@@ -720,7 +720,7 @@ int main(int argc, char *argv[]){
             string sdfsfilename;cin>>sdfsfilename;
             string to_print =  "Put command start: "+ to_string(cur_time_in_ms());
             print_to_sdfs_log(to_print, true);
-            thread(send_file, localfilename, sdfsfilename, find_master(membership_set, hash_string(sdfsfilename)), "P", false);
+            thread(send_file, localfilename, sdfsfilename, find_master(membership_set, hash_string(sdfsfilename)), "P", false).detach();
         } else if(input == "Delete" || input == "delete" || input == "D" || input == "d") {
             string name;cin>>name;
             send_a_tcp_message("D"+name, find_master(membership_set, hash_string(name)));
