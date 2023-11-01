@@ -267,7 +267,8 @@ void receive_a_file(int clifd){
     post_receive_a_file(cmd, filename);
 
     update_finish_event(event_num);
-    cout << cmd << " command end: " << cur_time_in_ms() << endl;
+    string to_print = string(1,cmd) + " command end: " + to_string(cur_time_in_ms());
+    print_to_sdfs_log(to_print, true);
 }
 
 void file_receiver(){
@@ -692,12 +693,14 @@ int main(int argc, char *argv[]){
         if(input == "Get" || input == "get" || input == "G" || input == "g") {
             string sdfsfilename;cin>>sdfsfilename;
             string localfilename;cin>>localfilename;
-            cout << "Get command start: " << cur_time_in_ms() << endl;
+            string to_print =  "Get command start: " + to_string(cur_time_in_ms());
+            print_to_sdfs_log(to_print, true);
             send_a_tcp_message("G"+sdfsfilename+" "+localfilename+" "+to_string(machine_idx), find_master(membership_set, hash_string(sdfsfilename)));
         } else if(input == "Put" || input == "put" || input == "P" || input == "p") {
             string localfilename;cin>>localfilename;
             string sdfsfilename;cin>>sdfsfilename;
-            cout << "Put command start: " << cur_time_in_ms() << endl;
+            string to_print =  "Put command start: "+ to_string(cur_time_in_ms());
+            print_to_sdfs_log(to_print, true);
             send_file(localfilename, sdfsfilename, find_master(membership_set, hash_string(sdfsfilename)), "P", false);
         } else if(input == "Delete" || input == "delete" || input == "D" || input == "d") {
             string name;cin>>name;
