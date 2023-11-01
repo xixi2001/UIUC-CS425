@@ -49,14 +49,17 @@ unsigned long long read_lock() {
     auto last_write = last_write_num;
     event_num_lock.unlock();
     // cout << "send file: " << " event: " << event_num << " last write: " << last_write << endl;
-    
+    long long count = 0;
     while(true){// block before previous write is finished
         event_num_lock.lock();
         auto finish_num = finish_event_num;
         event_num_lock.unlock();
-        stringstream ss;
-        ss << "send file: " << " event: " << event_num << " last write: " << last_write << " cur finished: " << finish_num << endl;
-        print_to_sdfs_log(ss.str(), false);
+        count++;
+        if(count % 1000 == 0){
+            stringstream ss;
+            ss << "send file: " << " event: " << event_num << " last write: " << last_write << " cur finished: " << finish_num << endl;
+            print_to_sdfs_log(ss.str(), false);
+        }
         if(finish_num >= last_write) break; 
     }
     return event_num;
@@ -69,14 +72,18 @@ unsigned long long write_lock() {
     last_write_num = event_num;
     event_num_lock.unlock();
     // cout << "receive file: " << " event: " << event_num << endl;
-
+    long long count = 0;
     while(true){// block before previous event is finished
         event_num_lock.lock();
         auto finish_num = finish_event_num;
         event_num_lock.unlock();
-        stringstream ss;
-        ss << "receive file: " << " event: " << event_num << " cur finished: " << finish_num << endl;
-        print_to_sdfs_log(ss.str(), false);
+        count++;
+        if(count % 1000 == 0){
+            stringstream ss;
+            ss << "receive file: " << " event: " << event_num << " cur finished: " << finish_num << endl;
+            print_to_sdfs_log(ss.str(), false);
+        }
+        
         if(finish_num + 1 == event_num) break; 
     }
     return event_num;
@@ -88,7 +95,7 @@ void update_finish_event(unsigned long long event_num){
     if(unfinished_events.empty()){
         finish_event_num = cur_event_num; 
     } else {
-        finish_event_num = *(unfinished_events.rbegin()) - 1;
+        finish_event_num = *(unfinished_events.begin()) - 1;
     }
     stringstream ss;
     ss << "unfinished events: ";
@@ -672,6 +679,17 @@ void deleteDirectoryContents(const std::filesystem::path& dir){
         std::filesystem::remove_all(entry.path());
 }
 
+void exp3(const std::filesystem::path& dir){
+    sleep(10);
+    set<int> membership_set = get_current_live_membership_set();
+    for (const auto& entry : std::filesystem::directory_iterator(dir)){
+        vector<string> path = tokenize(entry.path(), '/');
+        string to_print =  "Put command start: "+ to_string(cur_time_in_ms());
+        print_to_sdfs_log(to_print, true);
+        thread(send_file, entry.path(), path[2], find_master(membership_set, hash_string(path[2])), "P", false).detach();
+    }
+}
+
 int main(int argc, char *argv[]){
     init_ip_list();
     deleteDirectoryContents("./sdfs_files/");
@@ -687,6 +705,7 @@ int main(int argc, char *argv[]){
     thread(membership_listener).detach();
     thread(file_receiver).detach();
     
+    if(machine_idx == 1) exp3("./wiki/");
     string input;
     while(cin>>input){
         set<int> membership_set = get_current_live_membership_set();
@@ -701,7 +720,7 @@ int main(int argc, char *argv[]){
             string sdfsfilename;cin>>sdfsfilename;
             string to_print =  "Put command start: "+ to_string(cur_time_in_ms());
             print_to_sdfs_log(to_print, true);
-            send_file(localfilename, sdfsfilename, find_master(membership_set, hash_string(sdfsfilename)), "P", false);
+            thread(send_file, localfilename, sdfsfilename, find_master(membership_set, hash_string(sdfsfilename)), "P", false);
         } else if(input == "Delete" || input == "delete" || input == "D" || input == "d") {
             string name;cin>>name;
             send_a_tcp_message("D"+name, find_master(membership_set, hash_string(name)));
