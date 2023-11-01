@@ -55,7 +55,7 @@ unsigned long long read_lock() {
         auto finish_num = finish_event_num;
         event_num_lock.unlock();
         count++;
-        if(count % 1000 == 0){
+        if(count % 1000 == 1){
             stringstream ss;
             ss << "send file: " << " event: " << event_num << " last write: " << last_write << " cur finished: " << finish_num << endl;
             print_to_sdfs_log(ss.str(), false);
@@ -78,7 +78,7 @@ unsigned long long write_lock() {
         auto finish_num = finish_event_num;
         event_num_lock.unlock();
         count++;
-        if(count % 1000 == 0){
+        if(count % 1000 == 1){
             stringstream ss;
             ss << "receive file: " << " event: " << event_num << " cur finished: " << finish_num << endl;
             print_to_sdfs_log(ss.str(), false);
@@ -680,7 +680,7 @@ void deleteDirectoryContents(const std::filesystem::path& dir){
 }
 
 void exp3(const std::filesystem::path& dir){
-    sleep(10);
+    sleep(3);
     set<int> membership_set = get_current_live_membership_set();
     for (const auto& entry : std::filesystem::directory_iterator(dir)){
         vector<string> path = tokenize(entry.path(), '/');
@@ -705,7 +705,7 @@ int main(int argc, char *argv[]){
     thread(membership_listener).detach();
     thread(file_receiver).detach();
     
-    if(machine_idx == 1) exp3("./wiki/");
+    if(machine_idx == 0) exp3("./wiki/");
     string input;
     while(cin>>input){
         set<int> membership_set = get_current_live_membership_set();
