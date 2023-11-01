@@ -256,8 +256,8 @@ void receive_a_file(int clifd){
     char buf[receive_buffer_size];
     memset(buf, 0, sizeof(buf));
 
-    while(read(clifd, buf, sizeof(buf))) {
-        dst_file << buf;
+    while((nbytes = read(clifd, buf, sizeof(buf)))> 0) {
+        dst_file.write(buf, nbytes);
         memset(buf, 0, sizeof(buf));
     }
     dst_file.close();
