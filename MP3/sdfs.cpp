@@ -165,7 +165,7 @@ void send_file(string src, string dst, int target_idx, string cmd, bool is_in_sd
     src = (is_in_sdfs_folder ? "sdfs_files/":"")+ src;
     ifstream readSrcFile( src );
     if(!readSrcFile){
-        cout << "[ERROR] Cannot open source file:" << src;
+        cout << "[ERROR] Cannot open source file:" << src << endl;
         return;
 	}
     print_to_sdfs_log("Send a file to " + to_string(target_idx + 1) + " file: " +(is_in_sdfs_folder ? "sdfs_files/":"") + src, true);
@@ -484,6 +484,10 @@ void membership_listener(){
             if(!last_membership_set.count(x))
                 join_list.push_back(x);
         if( crash_list.size() > 0 || join_list.size() > 0 ) {
+            if(crash_list.size() > 0){
+                string to_print =  "Handle crash start: "+ to_string(cur_time_in_ms());
+                print_to_sdfs_log(to_print, true);
+            }  
             set<int> new_slave_idx = get_new_slave_idx_set(new_membership_set);
             for(int x : crash_list) {
                 print_to_sdfs_log("handle " + to_string(x + 1) + " Crasehed", true);
@@ -496,6 +500,10 @@ void membership_listener(){
                 slave_idx_set_lock.unlock();
                 handle_crash(x, new_membership_set, delta_slaves);
             }
+            if(crash_list.size() > 0){
+                string to_print =  "Handle crash end: "+ to_string(cur_time_in_ms());
+                print_to_sdfs_log(to_print, true);
+            }  
             for(int x : join_list){
                 print_to_sdfs_log("handle " + to_string(x + 1) + " Joined", true);
                 handle_join(x, new_membership_set, new_slave_idx, get_new_master_idx_set(new_membership_set));
@@ -705,7 +713,7 @@ int main(int argc, char *argv[]){
     thread(membership_listener).detach();
     thread(file_receiver).detach();
     
-    if(machine_idx == 0) exp3("./wiki/");
+    // if(machine_idx == 0) exp3("./wiki/");
     string input;
     while(cin>>input){
         set<int> membership_set = get_current_live_membership_set();
@@ -728,6 +736,8 @@ int main(int argc, char *argv[]){
             //TODO
         } else if(input == "ls") {
             print_current_files();
+        } else if(input == "leave"){
+            return 0;
         } else{
             puts("Unsupported Command!");
         }
