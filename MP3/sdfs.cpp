@@ -55,7 +55,7 @@ unsigned long long read_lock() {
         auto finish_num = finish_event_num;
         event_num_lock.unlock();
         count++;
-        if(count % 1000 == 1){
+        if(count % 100000000 == 1){
             stringstream ss;
             ss << "send file: " << " event: " << event_num << " last write: " << last_write << " cur finished: " << finish_num << endl;
             print_to_sdfs_log(ss.str(), false);
@@ -78,7 +78,7 @@ unsigned long long write_lock() {
         auto finish_num = finish_event_num;
         event_num_lock.unlock();
         count++;
-        if(count % 1000 == 1){
+        if(count % 100000000 == 1){
             stringstream ss;
             ss << "receive file: " << " event: " << event_num << " cur finished: " << finish_num << endl;
             print_to_sdfs_log(ss.str(), false);
@@ -680,9 +680,9 @@ void deleteDirectoryContents(const std::filesystem::path& dir){
 }
 
 void exp3(const std::filesystem::path& dir){
-    sleep(3);
-    set<int> membership_set = get_current_live_membership_set();
+    sleep(10);
     for (const auto& entry : std::filesystem::directory_iterator(dir)){
+        set<int> membership_set = get_current_live_membership_set();
         vector<string> path = tokenize(entry.path(), '/');
         string to_print =  "Put command start: "+ to_string(cur_time_in_ms());
         print_to_sdfs_log(to_print, true);
