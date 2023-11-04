@@ -687,16 +687,6 @@ void deleteDirectoryContents(const std::filesystem::path& dir){
         std::filesystem::remove_all(entry.path());
 }
 
-void exp3(const std::filesystem::path& dir){
-    sleep(10);
-    for (const auto& entry : std::filesystem::directory_iterator(dir)){
-        set<int> membership_set = get_current_live_membership_set();
-        vector<string> path = tokenize(entry.path(), '/');
-        string to_print =  "Put command start: "+ to_string(cur_time_in_ms());
-        print_to_sdfs_log(to_print, true);
-        thread(send_file, entry.path(), path[2], find_master(membership_set, hash_string(path[2])), "P", false).detach();
-    }
-}
 
 int main(int argc, char *argv[]){
     init_ip_list();
@@ -713,7 +703,6 @@ int main(int argc, char *argv[]){
     thread(membership_listener).detach();
     thread(file_receiver).detach();
     
-    // if(machine_idx == 0) exp3("./wiki/");
     string input;
     while(cin>>input){
         set<int> membership_set = get_current_live_membership_set();
