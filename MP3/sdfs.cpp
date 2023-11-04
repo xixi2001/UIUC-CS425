@@ -119,12 +119,13 @@ void post_receive_a_file(const char cmd,const string& filename){
             thread(send_file, filename, filename, slave_idx, "p", true).detach();
         slave_idx_set_lock.unlock();
         print_to_sdfs_log("Get master file: " + filename, true);
-    }
-    else if(cmd == 'p'){
+    } else if(cmd == 'p'){
         slave_files_lock.lock();
         slave_files.insert(filename);
         slave_files_lock.unlock();
         print_to_sdfs_log("Get slave file: " + filename, true);
+    } else if(cmd == 'G') {
+        print_to_sdfs_log("Get local file: " + filename, true);
     }
 
 }
@@ -755,8 +756,22 @@ int main(int argc, char *argv[]){
             int k;cin>>k;
             for(int i=1;i<=k;i++){
                 int x;cin>>x;
+                if(!membership_set.count(x))continue;
                 thread(send_a_tcp_message, "G"+file_name+" "+file_name+" "+to_string(x), find_master(membership_set, hash_string(file_name))).detach();
             }
+        } else if(input == "list_mem" || input == "member" || input == "mem"){
+            print_membership_list();
+        } else if(input == "list_self" || input == "self") {
+            cout << "machine index: " << machine_idx << endl;
+        } else if(input == "leave") {
+            return 0;
+        } else if(input == "CHANGE" || input == "C") {
+            local_mode_change();
+            print_current_mode();
+            group_mode_change();
+        } else if(input == "LOCAL" || input == "LOCALC" || input == "LOCALCHANGE"){
+            local_mode_change();
+            print_current_mode();
         } else{
             puts("Unsupported Command!");
         }

@@ -90,9 +90,12 @@ void print_detailed_list(const map<pair<string,int64_t>, MemberEntry> & other){
     print_to_membership_log(ss.str(), false);
 }
 
-inline void print_current_mode(){
+void print_current_mode(){
     if(suspection_mode) puts("In Gossip+Suspection Mode");
     else puts("In Gossip Mode");
+}
+void local_mode_change(){
+    suspection_mode ^= 1;
 }
 
 void init_ip_list(){

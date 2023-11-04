@@ -45,7 +45,9 @@ void print_membership_list();
 
 void print_detailed_list(const map<pair<string,int64_t>, MemberEntry> & other);
 
-inline void print_current_mode();
+void print_current_mode();
+
+void local_mode_change();
 
 void message_receiver();
 /*
