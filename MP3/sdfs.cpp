@@ -169,7 +169,7 @@ void send_file(string src, string dst, int target_idx, string cmd, bool is_in_sd
         cout << "[ERROR] Cannot open source file:" << src << endl;
         return;
 	}
-    print_to_sdfs_log("Send a file to " + to_string(target_idx + 1) + " file: " +(is_in_sdfs_folder ? "sdfs_files/":"") + src, true);
+    print_to_sdfs_log("Send a file to " + to_string(target_idx + 1) + " file name: " +(is_in_sdfs_folder ? "sdfs_files/":"") + src, true);
 
 
     string target_ip = get_ip_address_from_index(target_idx);
@@ -199,7 +199,7 @@ void send_file(string src, string dst, int target_idx, string cmd, bool is_in_sd
         puts("[ERROR] Socket write fail!");
         return;
 	}
-    print_to_sdfs_log(info, true);
+    // print_to_sdfs_log(info, true);
 
     char ret[max_buffer_size];
     memset(ret, 0, sizeof(ret));
@@ -258,7 +258,7 @@ void receive_a_file(int clifd){
         puts("[ERROR] Socket write fail!");
         return;
     }
-    print_to_sdfs_log(res, true);
+    // print_to_sdfs_log(res, true);
 
     auto event_num = write_lock();
 
@@ -355,7 +355,7 @@ void tcp_message_receiver(){
         string filename = info[0];
         string ret;
 
-        print_to_sdfs_log("Received a message: " + msg_str, true);
+        print_to_sdfs_log("Received a message: " + msg_str, false);
         
         switch(msg_str[0]){
             case 'D':
@@ -482,11 +482,11 @@ void send_a_tcp_message(const string& str, int target_index){
         if(ret[5] == 'e') {
             auto membership_set = get_current_live_membership_set();
             stringstream ss;
-            ss << "master: " << target_index << " ";
+            ss << "master: " << target_index + 1 << " ";
             ss << "slave: ";
             int slave_id = find_next_live_id(membership_set, target_index);
             for(int i=1;i<=3;i++){
-                ss << slave_id << " ";
+                ss << slave_id + 1 << " ";
                 slave_id = find_next_live_id(membership_set, slave_id);
             }
             print_to_sdfs_log(ss.str(), true);
@@ -748,16 +748,18 @@ int main(int argc, char *argv[]){
             send_a_tcp_message("D"+name, find_master(membership_set, hash_string(name)));
         } else if(input == "Store" || input == "store" || input == "S" || input == "s") {
             print_current_files();
-        } else if(input == "ls") {
+        } else if(input == "ls" || input == "list") {
             string file_name;cin>>file_name;
             send_a_tcp_message("L"+file_name+" "+to_string(machine_idx), find_master(membership_set, hash_string(file_name)));
         } else if(input == "multiread" || input == "mr"){
-            string file_name;cin>>file_name;
+            string sdfsfilename;cin>>sdfsfilename;
+            string localfilename;cin>>localfilename;
             int k;cin>>k;
             for(int i=1;i<=k;i++){
                 int x;cin>>x;
+                x--;
                 if(!membership_set.count(x))continue;
-                thread(send_a_tcp_message, "G"+file_name+" "+file_name+" "+to_string(x), find_master(membership_set, hash_string(file_name))).detach();
+                thread(send_a_tcp_message, "G"+sdfsfilename+" "+localfilename+" "+to_string(x), find_master(membership_set, hash_string(sdfsfilename))).detach();
             }
         } else if(input == "list_mem" || input == "member" || input == "mem"){
             print_membership_list();
