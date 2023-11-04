@@ -225,6 +225,10 @@ void send_file(string src, string dst, int target_idx, string cmd, bool is_in_sd
 
 	close(fd);
 
+    if(cmd == "P") {
+        print_to_sdfs_log("send " + src + " success", true);
+    }
+
     update_finish_event(event_num);
 }
 
@@ -274,8 +278,8 @@ void receive_a_file(int clifd){
     post_receive_a_file(cmd, filename);
 
     update_finish_event(event_num);
-    string to_print = string(1,cmd) + " command end: " + to_string(cur_time_in_ms());
-    print_to_sdfs_log(to_print, true);
+    // string to_print = string(1,cmd) + " command end: " + to_string(cur_time_in_ms());
+    // print_to_sdfs_log(to_print, true);
 }
 
 void file_receiver(){
@@ -394,11 +398,13 @@ void tcp_message_receiver(){
                 print_current_files();
                 break;
             case 'G':
+            case 'L':
                 if(master_files.find(info[0]) == master_files.end())
                     ret = "File doesn't exist!";
                 else{
                     ret = "File exists!";
-                    thread(send_file, info[0], info[1], stoi(info[2]), "G", true).detach();
+                    if(msg_str[0] == 'G')
+                        thread(send_file, info[0], info[1], stoi(info[2]), "G", true).detach();
                 }
 
                 print_to_sdfs_log("Requst " + filename + ": " + ret, true);
@@ -465,6 +471,24 @@ void send_a_tcp_message(const string& str, int target_index){
         if((nbytes=recv(fd, ret, sizeof(ret),0)) < 0){//"read" will block until receive data 
             puts("[Error] TCP message receiver read fail!");
             return;
+        }
+    } else if(str[0] == 'L'){
+        if((nbytes=recv(fd, ret, sizeof(ret),0)) < 0){//"read" will block until receive data 
+            puts("[Error] TCP message receiver read fail!");
+            return;
+        }
+        print_to_sdfs_log(ret, true);
+        if(ret[5] == 'e') {
+            auto membership_set = get_current_live_membership_set();
+            stringstream ss;
+            ss << "master: " << target_index << " ";
+            ss << "slave: ";
+            int slave_id = find_next_live_id(membership_set, target_index);
+            for(int i=1;i<=3;i++){
+                ss << slave_id << " ";
+                slave_id = find_next_live_id(membership_set, slave_id);
+            }
+            print_to_sdfs_log(ss.str(), true);
         }
     }
 	
@@ -709,24 +733,30 @@ int main(int argc, char *argv[]){
         if(input == "Get" || input == "get" || input == "G" || input == "g") {
             string sdfsfilename;cin>>sdfsfilename;
             string localfilename;cin>>localfilename;
-            string to_print =  "Get command start: " + to_string(cur_time_in_ms());
-            print_to_sdfs_log(to_print, true);
+            // string to_print =  "Get command start: " + to_string(cur_time_in_ms());
+            // print_to_sdfs_log(to_print, true);
             send_a_tcp_message("G"+sdfsfilename+" "+localfilename+" "+to_string(machine_idx), find_master(membership_set, hash_string(sdfsfilename)));
         } else if(input == "Put" || input == "put" || input == "P" || input == "p") {
             string localfilename;cin>>localfilename;
             string sdfsfilename;cin>>sdfsfilename;
-            string to_print =  "Put command start: "+ to_string(cur_time_in_ms());
-            print_to_sdfs_log(to_print, true);
+            // string to_print =  "Put command start: "+ to_string(cur_time_in_ms());
+            // print_to_sdfs_log(to_print, true);
             thread(send_file, localfilename, sdfsfilename, find_master(membership_set, hash_string(sdfsfilename)), "P", false).detach();
         } else if(input == "Delete" || input == "delete" || input == "D" || input == "d") {
             string name;cin>>name;
             send_a_tcp_message("D"+name, find_master(membership_set, hash_string(name)));
         } else if(input == "Store" || input == "store" || input == "S" || input == "s") {
-            //TODO
-        } else if(input == "ls") {
             print_current_files();
-        } else if(input == "leave"){
-            return 0;
+        } else if(input == "ls") {
+            string file_name;cin>>file_name;
+            send_a_tcp_message("L"+file_name+" "+to_string(machine_idx), find_master(membership_set, hash_string(file_name)));
+        } else if(input == "multiread" || input == "mr"){
+            string file_name;cin>>file_name;
+            int k;cin>>k;
+            for(int i=1;i<=k;i++){
+                int x;cin>>x;
+                thread(send_a_tcp_message, "G"+file_name+" "+file_name+" "+to_string(x), find_master(membership_set, hash_string(file_name))).detach();
+            }
         } else{
             puts("Unsupported Command!");
         }

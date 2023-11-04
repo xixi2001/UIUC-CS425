@@ -43,6 +43,8 @@ int hash_string(const string &str);
 
 int find_master(const set<int> &membership_set, int hash_value);// give the hash value, find corresponding master
 
+int find_next_live_id(const set<int> &s,int x); 
+
 void handle_crash(int crash_idx, const set<int> &new_membership_set, const set<int>& delta_slaves);
 /*
 if is the NEXT machine of crash_idx:
