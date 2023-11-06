@@ -473,6 +473,7 @@ void send_a_tcp_message(const string& str, int target_index){
             puts("[Error] TCP message receiver read fail!");
             return;
         }
+        print_to_sdfs_log(ret, true);
     } else if(str[0] == 'L'){
         if((nbytes=recv(fd, ret, sizeof(ret),0)) < 0){//"read" will block until receive data 
             puts("[Error] TCP message receiver read fail!");
