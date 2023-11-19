@@ -1,19 +1,19 @@
-#ifndef _MAPLE_JUICE_H
-#define _MAPLE_JUICE_H
+
+#ifndef _MJ_H
+#define _MJ_H
 #include "sdfs.h"
 #include <queue>
 using namespace std;
 
 void send_mj_message();
-/* TODO:
-    (1) M: initiate a maple command (send to leader)
+/*  (1) M: initiate a maple command (send to leader)
     (2) m: send maple command to worker (send to worker)
 */
 
 queue<string> command_queue;
 mutex command_queue_lock;
 void mj_message_receiver();
-/* TODO:
+/*  
     (1) M: queue commands
     (2) m: initiate work_maple_task 
 */
@@ -23,7 +23,7 @@ void command_queue_listener(); // only at leader
 /* TODO:
     while (1) {
         get command from queue if not empty
-        devide input_file into chunks
+        divide input_file into chunks
         initiate maple_task_monitor for the chunk
     }
     
@@ -50,5 +50,6 @@ void maple_task_monitor(const string& cmd, const vector<string>& files);
         
 */
 
+void print_to_mj_log(const string& str, bool flag);
 
 #endif
