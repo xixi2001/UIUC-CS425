@@ -1,15 +1,19 @@
+#ifndef _SDFS_H
+#define _SDFS_H
 #include "membership.h"
 #include <set>
 using namespace std;
 
+
 vector<string> tokenize(string input, char delimeter);
+
+vector<string> get_files_from_folder(const string& dir);
 
 void sdfs_message_receiver();
 /* TODO:
     message type:
         (1) C: master combine files with the same file name prefix & delete temp files
-        (2) c: slave combine files with the same file name prefix & delete temp files
-        (3) F: send master file name to connected socket
+        (2) F: send master file name to connected socket
 */
 
 void send_a_sdfs_message(const string& str, int target_index);
@@ -38,3 +42,8 @@ void print_current_files();
 
 void start_sdfs_service();
 
+void get_machine_id();
+
+void wait_until_all_files_are_received();
+
+#endif

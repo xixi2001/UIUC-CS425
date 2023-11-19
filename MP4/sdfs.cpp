@@ -13,8 +13,8 @@
 using namespace std;
 // namespace fs = std::filesystem;
 
-int machine_idx;
-
+extern int machine_idx;
+extern int64_t start_time_ms;
 mutex master_files_lock;
 set<string> master_files; // files save as master; string is the file name
 mutex slave_files_lock;
@@ -677,7 +677,6 @@ void handle_join(int join_idx, const set<int> &new_membership_set, const set<int
     slave_files_lock.unlock();
 }
 
-int64_t start_time_ms;
 mutex fsdfs_out_lock;
 ofstream fsdfs_out;
 void print_to_sdfs_log(const string& str, bool flag){
