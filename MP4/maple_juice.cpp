@@ -333,12 +333,33 @@ int main(int argc, char *argv[]){
     start_time_ms = cur_time_in_ms();
     mj_out.open( "mj_" + std::to_string(machine_idx + 1) + "_" + std::to_string(start_time_ms) +".log");
     
+    start_sdfs_service();
     thread(mj_message_receiver).detach();
     
     string input;
     while(cin>>input){
         set<int> membership_set = get_current_live_membership_set();
-        if(input == "maple" || input == "Maple" || input == "M" || input == "m") {
+        if(input == "Get" || input == "get" || input == "G" || input == "g") {
+            string sdfsfilename;cin>>sdfsfilename;
+            string localfilename;cin>>localfilename;
+            // string to_print =  "Get command start: " + to_string(cur_time_in_ms());
+            // print_to_sdfs_log(to_print, true);
+            send_a_sdfs_message("G"+sdfsfilename+" "+localfilename+" "+to_string(machine_idx), find_master(membership_set, hash_string(sdfsfilename)));
+        } else if(input == "Put" || input == "put" || input == "P" || input == "p") {
+            string localfilename;cin>>localfilename;
+            string sdfsfilename;cin>>sdfsfilename;
+            // string to_print =  "Put command start: "+ to_string(cur_time_in_ms());
+            // print_to_sdfs_log(to_print, true);
+            thread(send_file, localfilename, sdfsfilename, find_master(membership_set, hash_string(sdfsfilename)), "P", false).detach();
+        } else if(input == "Delete" || input == "delete" || input == "D" || input == "d") {
+            string name;cin>>name;
+            send_a_sdfs_message("D"+name, find_master(membership_set, hash_string(name)));
+        } else if(input == "Store" || input == "store" || input == "S" || input == "s") {
+            print_current_files();
+        } else if(input == "ls" || input == "list") {
+            string file_name;cin>>file_name;
+            send_a_sdfs_message("L"+file_name+" "+to_string(machine_idx), find_master(membership_set, hash_string(file_name)));
+        } else if(input == "maple" || input == "Maple" || input == "M" || input == "m") {
             string maple_exe;cin>>maple_exe;
             string num_maples;cin>>num_maples;
             string sdfs_intermediate_filename_prefix;cin>>sdfs_intermediate_filename_prefix;
