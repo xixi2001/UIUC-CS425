@@ -859,6 +859,7 @@ void deleteDirectoryContents(const std::filesystem::path& dir){
 void start_sdfs_service() {
     init_ip_list();
     deleteDirectoryContents("./sdfs_files/");
+    system("mkdir ./sdfs_files");
     system("mkdir ./sdfs_files/input");
     fsdfs_out.open( std::to_string(machine_idx + 1) + "_" + std::to_string(start_time_ms) +".log");
     start_membership_service(get_ip_address_from_index(machine_idx));

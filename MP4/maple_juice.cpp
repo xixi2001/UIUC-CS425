@@ -134,17 +134,18 @@ vector<vector<string>> range_based_partition(vector<string>& files, int num_task
     return ret;
 }
 
+int hash_file(const string &str, int num_tasks){
+    unsigned int sum = 0;
+    for(auto s:str)sum = sum*19260817 + s;
+    return sum % num_tasks;
+}
+
 vector<vector<string>>hash_based_partition(vector<string>& files, int num_tasks, set<int> membership_set){
-    auto hash_file = [&num_tasks](const string &str)->int{
-        unsigned int sum = 0;
-        for(auto s:str)sum = sum*19260817 + s;
-        return sum % num_tasks;
-    };
 
     vector<vector<string>> ret = vector<vector<string>> (num_tasks, vector<string>(0));
     
     for(string file : files){
-        int task_id = hash_file(file);
+        int task_id = hash_file(file, num_tasks);
         ret[task_id].push_back(file);
     }
 

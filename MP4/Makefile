@@ -9,7 +9,8 @@ maple_juice: membership.cpp sdfs.cpp maple_juice.cpp
 	$(CXX) $(CXXFLAGS) membership.cpp sdfs.cpp maple_juice.cpp $(CXXFLAGS_THREAD) $(CXXFLAGS_FILESYSTEM) -o maple_juice
 
 clean:
-	rm maple_juice *.log
-	rm sdfs_files/*
+	rm -rf sdfs_files
+	rm maple_juice
+	rm  *.log
 
 .PHONY: clean
