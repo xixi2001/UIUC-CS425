@@ -211,7 +211,7 @@ void work_maple_task(const string& cmd, int socket_num){
     for(int i = 6; i < info.size(); i++){
         thread(send_a_sdfs_message,"G"+info[i]+" "+"./local_input/"+info[i]+" "+to_string(machine_idx), find_master(membership_set, hash_string(info[i]))).detach();
     }
-    wait_until_all_files_are_received();
+    wait_until_all_files_are_processed();
     print_to_mj_log("[worker]: All files are received", false);
     
     // call maple_exec
@@ -246,11 +246,10 @@ void work_maple_task(const string& cmd, int socket_num){
     vector<thread> sendTasks;
     for(auto pair : maple_result){
         string filename = sdfs_intermediate_filename_prefix+"_"+pair.first+"_"+to_string(machine_idx + 1);
-        sendTasks.push_back(thread(send_file, "./local_result/" + filename, filename, find_master(membership_set, hash_string(filename)), "P", false));
+        thread(send_file, "./local_result/" + filename, filename, find_master(membership_set, hash_string(filename)), "P", false).detach();
     }
 
-    for (thread & th : sendTasks)
-            th.join();
+    wait_until_all_files_are_processed();
     
     // send success (S message) to leader & delete temp files
     int nbytes;
@@ -281,7 +280,7 @@ void maple_task_monitor(const string& cmd, const vector<string>& files){
         for(string file : files)
             cur_cmd += (" " +  file);
         
-        print_to_mj_log("[leader]: distribute \"" + cur_cmd + "\" to worker " + to_string(target_index + 1), false);
+        print_to_mj_log("[leader]: distribute \"" + cur_cmd + "\" to worker " + to_string(target_index + 1), true);
         string target_ip = get_ip_address_from_index(target_index);
         
         int fd;
@@ -354,14 +353,10 @@ int main(int argc, char *argv[]){
         if(input == "Get" || input == "get" || input == "G" || input == "g") {
             string sdfsfilename;cin>>sdfsfilename;
             string localfilename;cin>>localfilename;
-            // string to_print =  "Get command start: " + to_string(cur_time_in_ms());
-            // print_to_sdfs_log(to_print, true);
             send_a_sdfs_message("G"+sdfsfilename+" "+localfilename+" "+to_string(machine_idx), find_master(membership_set, hash_string(sdfsfilename)));
         } else if(input == "Put" || input == "put" || input == "P" || input == "p") {
             string localfilename;cin>>localfilename;
             string sdfsfilename;cin>>sdfsfilename;
-            // string to_print =  "Put command start: "+ to_string(cur_time_in_ms());
-            // print_to_sdfs_log(to_print, true);
             thread(send_file, localfilename, sdfsfilename, find_master(membership_set, hash_string(sdfsfilename)), "P", false).detach();
         } else if(input == "Delete" || input == "delete" || input == "D" || input == "d") {
             string name;cin>>name;
@@ -378,8 +373,12 @@ int main(int argc, char *argv[]){
             string sdfs_src_directory;cin>>sdfs_src_directory;
             string to_print =  "Get command start: " + to_string(cur_time_in_ms());
             print_to_sdfs_log(to_print, true);
-            send_mj_message("maple " + maple_exe + " " + num_maples + " " + sdfs_intermediate_filename_prefix + " " + sdfs_src_directory, 0);
+            send_mj_message("M " + maple_exe + " " + num_maples + " " + sdfs_intermediate_filename_prefix + " " + sdfs_src_directory, 0);
         }
     }
 }
+// put A input/A
+// put B input/B
+// put C input/C
+// maple maple_test 3 wc input/
 

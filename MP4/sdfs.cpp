@@ -858,8 +858,8 @@ void deleteDirectoryContents(const std::filesystem::path& dir){
 
 void start_sdfs_service() {
     init_ip_list();
-    deleteDirectoryContents("./sdfs_files/");
     system("mkdir ./sdfs_files");
+    deleteDirectoryContents("./sdfs_files/");
     system("mkdir ./sdfs_files/input");
     fsdfs_out.open( std::to_string(machine_idx + 1) + "_" + std::to_string(start_time_ms) +".log");
     start_membership_service(get_ip_address_from_index(machine_idx));
@@ -899,7 +899,7 @@ vector<string> get_files_from_folder(const string &prefix){
     return res;
 }
 
-void wait_until_all_files_are_received() {
+void wait_until_all_files_are_processed() {
     auto event_num = write_lock(); // block until all previous event are done
     // do nothing
     update_finish_event(event_num);

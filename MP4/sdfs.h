@@ -45,7 +45,7 @@ void start_sdfs_service();
 
 void get_machine_id();
 
-void wait_until_all_files_are_received();
+void wait_until_all_files_are_processed();
 
 void deleteDirectoryContents(const std::filesystem::path& dir);
 
