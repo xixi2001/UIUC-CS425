@@ -1,4 +1,5 @@
 #include "maple_juice.h"
+#include <chrono>
 #include <thread>
 #include <sys/socket.h> 
 #include <netinet/in.h> 
@@ -211,8 +212,9 @@ void work_maple_task(const string& cmd, int socket_num){
     for(int i = 6; i < info.size(); i++){
         vector<string> file_path = tokenize(info[i], '/');
         string file_name = file_path.back();
-        thread(send_a_sdfs_message,"G"+info[i]+" "+"./local_input/"+file_name+" "+to_string(machine_idx), find_master(membership_set, hash_string(info[i]))).detach();
+        send_a_sdfs_message("G"+info[i]+" "+"./local_input/"+file_name+" "+to_string(machine_idx), find_master(membership_set, hash_string(info[i])));
     }
+    this_thread::sleep_for(chrono::milliseconds(500));
     wait_until_all_files_are_processed();
     print_to_mj_log("[worker]: All files are received", false);
     
@@ -223,6 +225,7 @@ void work_maple_task(const string& cmd, int socket_num){
         vector<string> file_path = tokenize(info[i], '/');
         string file_name = file_path.back();
         string cmd = "./" + maple_exe + " ./local_input/" + file_name + " >> ./local_result/temp_result";
+        print_to_mj_log("Execute: " + cmd, true);
         system(cmd.c_str());
     }
     print_to_mj_log("[worker]: temp_result is generated", false);
