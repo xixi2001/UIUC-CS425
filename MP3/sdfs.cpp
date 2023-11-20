@@ -22,8 +22,8 @@ set<string> slave_files;  // files save as slave;string is file name; int is has
 mutex slave_idx_set_lock;
 set<int> slave_idx_set;
 
-unsigned long long cur_event_num = 0, finish_event_num = 0, last_write_num = 0;
-set<unsigned long long> unfinished_events;
+map<string, unsigned long long> cur_event_num, finish_event_num, last_write_num;
+map<string, set<unsigned long long> >unfinished_events;
 mutex event_num_lock;
 
 constexpr int max_buffer_size = 1024;
@@ -66,22 +66,22 @@ bool is_prefix(const string &s, const string &prefix){
     return 1;
 }
 
-unsigned long long read_lock() {
+unsigned long long read_lock(const string& file) {
     event_num_lock.lock();
-    auto event_num = ++cur_event_num;
-    unfinished_events.insert(event_num);
-    auto last_write = last_write_num;
+    auto event_num = ++cur_event_num[file];
+    unfinished_events[file].insert(event_num);
+    auto last_write = last_write_num[file];
     event_num_lock.unlock();
     // cout << "send file: " << " event: " << event_num << " last write: " << last_write << endl;
     long long count = 0;
     while(true){// block before previous write is finished
         event_num_lock.lock();
-        auto finish_num = finish_event_num;
+        auto finish_num = finish_event_num[file];
         event_num_lock.unlock();
         count++;
         if(count % 100000000 == 1){
             stringstream ss;
-            ss << "send file: " << " event: " << event_num << " last write: " << last_write << " cur finished: " << finish_num << endl;
+            ss << "send file: " << file << " ,event: " << event_num << " last write: " << last_write << " cur finished: " << finish_num << endl;
             print_to_sdfs_log(ss.str(), false);
         }
         if(finish_num >= last_write) break; 
@@ -89,17 +89,17 @@ unsigned long long read_lock() {
     return event_num;
 }
 
-unsigned long long write_lock() {
+unsigned long long write_lock(const string& file) {
     event_num_lock.lock();
-    auto event_num = ++cur_event_num;
-    unfinished_events.insert(event_num);
-    last_write_num = event_num;
+    auto event_num = ++cur_event_num[file];
+    unfinished_events[file].insert(event_num);
+    last_write_num[file] = event_num;
     event_num_lock.unlock();
     // cout << "receive file: " << " event: " << event_num << endl;
     long long count = 0;
     while(true){// block before previous event is finished
         event_num_lock.lock();
-        auto finish_num = finish_event_num;
+        auto finish_num = finish_event_num[file];
         event_num_lock.unlock();
         count++;
         if(count % 100000000 == 1){
@@ -113,20 +113,20 @@ unsigned long long write_lock() {
     return event_num;
 }
 
-void update_finish_event(unsigned long long event_num){
+void update_finish_event(unsigned long long event_num, const string& file){
     event_num_lock.lock();
-    unfinished_events.erase(event_num);
-    if(unfinished_events.empty()){
-        finish_event_num = cur_event_num; 
+    unfinished_events[file].erase(event_num);
+    if(unfinished_events[file].empty()){
+        finish_event_num[file] = cur_event_num[file]; 
     } else {
-        finish_event_num = *(unfinished_events.begin()) - 1;
+        finish_event_num[file] = *(unfinished_events[file].begin()) - 1;
     }
     stringstream ss;
     ss << "unfinished events: ";
-    for(auto x:unfinished_events)
+    for(auto x:unfinished_events[file])
         ss << x << " ";
     ss << endl;
-    print_to_sdfs_log("Update finish event num to: " + to_string(finish_event_num) 
+    print_to_sdfs_log("Update finish event num to: " + to_string(finish_event_num[file]) 
         + " finsied event num: " + to_string(event_num), false);
     print_to_sdfs_log(ss.str(), false);
     event_num_lock.unlock();
@@ -161,7 +161,7 @@ void local_file_copy(const string src, const string dst, const char cmd) {
         cout << "[ERROR] Cannot open source file:" << src;
         return;
 	}
-    auto event_num = write_lock();
+    auto event_num = write_lock(src);
     ofstream dst_file((cmd == 'G' ? "":"sdfs_files/") + dst);
     
     while(readSrcFile.good()){
@@ -179,7 +179,7 @@ void local_file_copy(const string src, const string dst, const char cmd) {
 
     post_receive_a_file(cmd, dst);
 
-    update_finish_event(event_num);
+    update_finish_event(event_num, src);
 }
 
 string to_string(const vector<string> &files) {
@@ -192,7 +192,7 @@ string to_string(const vector<string> &files) {
 }
 
 void merge_files_into_file(const vector<string> &files, const string &prefix) {
-    auto event_num = write_lock();
+    auto event_num = write_lock(prefix);
     print_to_sdfs_log("local copy from sdfs_files/" + to_string(files) + " to sdfs_files/" + prefix , true);
     ofstream dst_file("sdfs_files/" + prefix);
     for(const string &file:files){
@@ -214,7 +214,7 @@ void merge_files_into_file(const vector<string> &files, const string &prefix) {
         remove(("./sdfs_files/" + file).c_str());
     }
     dst_file.close();
-    update_finish_event(event_num);
+    update_finish_event(event_num, prefix);
 }
 
 void merge_all_files_with_common_prefix(const string& prefix) {
@@ -266,7 +266,7 @@ void send_file(string src, string dst, int target_idx, string cmd, bool is_in_sd
         cout << "[ERROR] Cannot open source file:" << src << endl;
         return;
 	}
-    print_to_sdfs_log("Send a file to " + to_string(target_idx + 1) + " file name: " +(is_in_sdfs_folder ? "sdfs_files/":"") + src, true);
+    print_to_sdfs_log("Send a file to " + to_string(target_idx + 1) + " file name: " + src, true);
 
 
     string target_ip = get_ip_address_from_index(target_idx);
@@ -305,7 +305,7 @@ void send_file(string src, string dst, int target_idx, string cmd, bool is_in_sd
         return;
     }
 
-    auto event_num = read_lock();
+    auto event_num = read_lock(src);
     
     while(readSrcFile.good()){
         string str;
@@ -327,7 +327,7 @@ void send_file(string src, string dst, int target_idx, string cmd, bool is_in_sd
         print_to_sdfs_log("send " + src + " success", true);
     }
 
-    update_finish_event(event_num);
+    update_finish_event(event_num, src);
 }
 
 void receive_a_file(int clifd){
@@ -357,10 +357,11 @@ void receive_a_file(int clifd){
     }
     // print_to_sdfs_log(res, true);
 
-    auto event_num = write_lock();
+    const string& dst = (cmd == 'G' ? "":"sdfs_files/")+filename;
+    auto event_num = write_lock(dst);
 
     // Start transfering file
-    ofstream dst_file((cmd == 'G' ? "":"sdfs_files/")+filename);
+    ofstream dst_file(dst);
     
     char buf[receive_buffer_size];
     memset(buf, 0, sizeof(buf));
@@ -375,7 +376,7 @@ void receive_a_file(int clifd){
 
     post_receive_a_file(cmd, filename);
 
-    update_finish_event(event_num);
+    update_finish_event(event_num, dst);
     // string to_print = string(1,cmd) + " command end: " + to_string(cur_time_in_ms());
     // print_to_sdfs_log(to_print, true);
 }
@@ -900,9 +901,10 @@ vector<string> get_files_under_folder(const string &prefix){
 }
 
 void wait_until_all_files_are_received() {
-    auto event_num = write_lock(); // block until all previous event are done
-    // do nothing
-    update_finish_event(event_num);
+    // TO BE DONE
+    // auto event_num = write_lock(); // block until all previous event are done
+    // // do nothing
+    // update_finish_event(event_num);
 }
 
 int main(int argc, char *argv[]){
