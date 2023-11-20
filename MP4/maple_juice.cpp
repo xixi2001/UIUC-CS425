@@ -209,7 +209,9 @@ void work_maple_task(const string& cmd, int socket_num){
     // get files from sdfs
     set<int> membership_set = get_current_live_membership_set();
     for(int i = 6; i < info.size(); i++){
-        thread(send_a_sdfs_message,"G"+info[i]+" "+"./local_input/"+info[i]+" "+to_string(machine_idx), find_master(membership_set, hash_string(info[i]))).detach();
+        vector<string> file_path = tokenize(info[i], '/');
+        string file_name = file_path.back();
+        thread(send_a_sdfs_message,"G"+info[i]+" "+"./local_input/"+file_name+" "+to_string(machine_idx), find_master(membership_set, hash_string(info[i]))).detach();
     }
     wait_until_all_files_are_processed();
     print_to_mj_log("[worker]: All files are received", false);
@@ -218,7 +220,9 @@ void work_maple_task(const string& cmd, int socket_num){
     string maple_exe = info[1];
     system("mkdir ./local_result");
     for(int i = 6; i < info.size(); i++){
-        string cmd = "./" + maple_exe + " ./local_input/" + info[i] + " >> ./local_result/temp_result";
+        vector<string> file_path = tokenize(info[i], '/');
+        string file_name = file_path.back();
+        string cmd = "./" + maple_exe + " ./local_input/" + file_name + " >> ./local_result/temp_result";
         system(cmd.c_str());
     }
     print_to_mj_log("[worker]: temp_result is generated", false);

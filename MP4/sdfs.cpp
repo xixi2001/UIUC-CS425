@@ -266,7 +266,7 @@ void send_file(string src, string dst, int target_idx, string cmd, bool is_in_sd
         cout << "[ERROR] Cannot open source file:" << src << endl;
         return;
 	}
-    print_to_sdfs_log("Send a file to " + to_string(target_idx + 1) + " file name: " +(is_in_sdfs_folder ? "sdfs_files/":"") + src, true);
+    print_to_sdfs_log("Send a file to " + to_string(target_idx + 1) + " file name: " + src, true);
 
 
     string target_ip = get_ip_address_from_index(target_idx);
