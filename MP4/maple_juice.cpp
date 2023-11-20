@@ -255,7 +255,7 @@ void work_maple_task(const string& cmd, int socket_num){
         string filename = sdfs_intermediate_filename_prefix+"_"+pair.first+"_"+to_string(machine_idx + 1);
         thread(send_file, "./local_result/" + filename, filename, find_master(membership_set, hash_string(filename)), "P", false).detach();
     }
-
+    this_thread::sleep_for(chrono::milliseconds(500));
     wait_until_all_files_are_processed();
     
     // send success (S message) to leader & delete temp files
