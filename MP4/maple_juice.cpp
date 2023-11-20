@@ -325,9 +325,28 @@ void print_to_mj_log(const string& str, bool flag){
 }
 
 int main(int argc, char *argv[]){
+    if(argc != 2){
+        puts("FATAL: please assign machine index!");
+        exit(0);
+    }
     machine_idx = stoi(argv[1]) - 1;
-    start_time_ms = cur_time_in_ms(); 
+    start_time_ms = cur_time_in_ms();
     mj_out.open( "mj_" + std::to_string(machine_idx + 1) + "_" + std::to_string(start_time_ms) +".log");
-    return 0;
+    
+    thread(mj_message_receiver).detach();
+    
+    string input;
+    while(cin>>input){
+        set<int> membership_set = get_current_live_membership_set();
+        if(input == "maple" || input == "Maple" || input == "M" || input == "m") {
+            string maple_exe;cin>>maple_exe;
+            string num_maples;cin>>num_maples;
+            string sdfs_intermediate_filename_prefix;cin>>sdfs_intermediate_filename_prefix;
+            string sdfs_src_directory;cin>>sdfs_src_directory;
+            string to_print =  "Get command start: " + to_string(cur_time_in_ms());
+            print_to_sdfs_log(to_print, true);
+            send_mj_message("maple " + maple_exe + " " + num_maples + " " + sdfs_intermediate_filename_prefix + " " + sdfs_src_directory, 0);
+        }
+    }
 }
 

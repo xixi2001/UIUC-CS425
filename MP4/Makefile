@@ -3,13 +3,13 @@ CXXFLAGS = -std=c++17
 CXXFLAGS_THREAD = -pthread
 CXXFLAGS_FILESYSTEM = -lstdc++fs
 
-all: sdfs
+all: maple_juice
 
-sdfs: membership.cpp sdfs.cpp maple_juice.cpp
-	$(CXX) $(CXXFLAGS) membership.cpp sdfs.cpp maple_juice.cpp $(CXXFLAGS_THREAD) $(CXXFLAGS_FILESYSTEM) -o sdfs
+maple_juice: membership.cpp sdfs.cpp maple_juice.cpp
+	$(CXX) $(CXXFLAGS) membership.cpp sdfs.cpp maple_juice.cpp $(CXXFLAGS_THREAD) $(CXXFLAGS_FILESYSTEM) -o maple_juice
 
 clean:
-	rm sdfs *.log
+	rm maple_juice *.log
 	rm sdfs_files/*
 
 .PHONY: clean
