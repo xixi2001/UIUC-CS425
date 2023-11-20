@@ -857,6 +857,18 @@ void deleteDirectoryContents(const std::filesystem::path& dir){
         std::filesystem::remove_all(entry.path());
 }
 
+void start_sdfs_service() {
+    init_ip_list();
+    deleteDirectoryContents("./sdfs_files/");
+    system("mkdir ./sdfs_files/input");
+    fsdfs_out.open( std::to_string(machine_idx + 1) + "_" + std::to_string(start_time_ms) +".log");
+    start_membership_service(get_ip_address_from_index(machine_idx));
+    
+    thread(sdfs_message_receiver).detach();
+    thread(membership_listener).detach();
+    thread(file_receiver).detach();
+}
+
 vector<string> get_files_under_folder(const string &prefix){
     set<int> membership_list = get_current_live_membership_set();
 

@@ -42,6 +42,30 @@ vector<string> tokenize(string input, char delimeter){
     return ret;
 }
 
+// check whether s == pre_##
+bool is_match_prefix(const string &s, const string &prefix){
+    if(s.length() != prefix.length() + 3){
+        return 0;
+    }
+    int cur = 0;
+    for(;cur < prefix.size(); cur++) {
+        if(s[cur] != prefix[cur]) {
+            return 0;
+        }
+    }
+    return s[cur] == '-';
+}
+
+bool is_prefix(const string &s, const string &prefix){
+    if(s.length() < prefix.length() )return 0;
+    for(int i=0; i<prefix.length(); i++){
+        if(s[i] != prefix[i]){
+            return 0;
+        }
+    }
+    return 1;
+}
+
 unsigned long long read_lock() {
     event_num_lock.lock();
     auto event_num = ++cur_event_num;
@@ -156,6 +180,79 @@ void local_file_copy(const string src, const string dst, const char cmd) {
     post_receive_a_file(cmd, dst);
 
     update_finish_event(event_num);
+}
+
+string to_string(const vector<string> &files) {
+    stringstream ss;
+    ss << "[";
+    for(const string& str:files)
+        ss << str << ",";
+    ss << "]";
+    return ss.str();
+}
+
+void merge_files_into_file(const vector<string> &files, const string &prefix) {
+    auto event_num = write_lock();
+    print_to_sdfs_log("local copy from sdfs_files/" + to_string(files) + " to sdfs_files/" + prefix , true);
+    ofstream dst_file("sdfs_files/" + prefix);
+    for(const string &file:files){
+        ifstream readSrcFile( "sdfs_files/" + file );
+        if(!readSrcFile){
+            cout << "[ERROR] Cannot open source file:" << file;
+            continue;
+        }
+        while(readSrcFile.good()){
+            string str;
+            while(str.length() < max_buffer_size/2 && readSrcFile.good()){
+                if(readSrcFile.peek() != -1)
+                str.push_back(readSrcFile.get());
+            }
+            const char *c_str = str.c_str();
+            dst_file << c_str;
+        }
+        readSrcFile.close();
+        remove(("./sdfs_files/" + file).c_str());
+    }
+    dst_file.close();
+    update_finish_event(event_num);
+}
+
+void merge_all_files_with_common_prefix(const string& prefix) {
+    master_files_lock.lock();
+    map<string, vector<string> > file_bucket;
+    for(const string& str:master_files) {
+        if(is_prefix(str, prefix)) {
+            const string prefix_key = str.substr(0, str.size() - 3);
+            if(!file_bucket.count(prefix_key)) {
+                file_bucket.emplace(prefix_key, vector<string>({}));
+            }
+            file_bucket[prefix_key].push_back(str);
+        }
+    }
+    for(const auto& [prefix_key, files] : file_bucket) {
+        merge_files_into_file(files, prefix_key);
+        for(const string& file : files)master_files.erase(file);
+        master_files.insert(prefix_key);
+    }
+    master_files_lock.unlock();
+
+    slave_files_lock.lock();
+    file_bucket.clear();
+    for(const string& str:slave_files) {
+        if(is_prefix(str, prefix)) {
+            const string prefix_key = str.substr(0, str.size() - 3);
+            if(!file_bucket.count(prefix_key)) {
+                file_bucket.emplace(prefix_key, vector<string>({}));
+            }
+            file_bucket[prefix_key].push_back(str);
+        }
+    }
+    for(const auto& [prefix_key, files] : file_bucket) {
+        merge_files_into_file(files, prefix_key);
+        for(const string& file : files)slave_files.erase(file);
+        slave_files.insert(prefix_key);
+    }
+    slave_files_lock.unlock();
 }
 
 void send_file(string src, string dst, int target_idx, string cmd, bool is_in_sdfs_folder){
@@ -350,7 +447,7 @@ void sdfs_message_receiver(){
 		}
 
         string msg_str(msg);
-        vector<string> info;
+        vector<string> info, files;
         info = tokenize(msg_str.substr(1), ' ');
         string filename = info[0];
         string ret;
@@ -411,7 +508,25 @@ void sdfs_message_receiver(){
 
                 if((nbytes=send(clifd, ret.c_str(), ret.size() ,0))<0){
                     puts("Socket write fail!");
-                    throw runtime_error("Socket write fail!");
+                    continue;
+                }
+                break;
+            case 'C':
+                merge_all_files_with_common_prefix(filename);
+                break;
+            case 'F':
+                master_files_lock.lock();
+                for(const string &file:master_files) {
+                    if(is_prefix(file, filename))
+                        ret += file + " ";
+                }
+                master_files_lock.unlock();
+
+                print_to_sdfs_log("Files under folder " + filename + ": " + ret, true);
+
+                if((nbytes=send(clifd, ret.c_str(), ret.size() ,0))<0){
+                    puts("Socket write fail!");
+                    continue;
                 }
                 break;
             default:
@@ -436,6 +551,10 @@ string to_string(const set<string> s){
         ss << x << " ";
     return ss.str();
 }
+
+mutex files_under_folder_lock;
+vector<string> files_under_folder;
+int file_folder_request_cnt;
 
 void send_a_sdfs_message(const string& str, int target_index){
     string target_ip = get_ip_address_from_index(target_index);
@@ -491,6 +610,19 @@ void send_a_sdfs_message(const string& str, int target_index){
             }
             print_to_sdfs_log(ss.str(), true);
         }
+    } else if(str[0] == 'F') {
+        if((nbytes=recv(fd, ret, sizeof(ret),0)) < 0){//"read" will block until receive data 
+            puts("[Error] TCP message receiver read fail!");
+            return;
+        }
+        print_to_sdfs_log("get folder result from " + to_string(target_index) + ": " + ret, true);
+        files_under_folder_lock.lock();
+        vector<string> files = tokenize(ret, ' ');
+        for(const string &file : files) {
+            files_under_folder.push_back(file);
+        }
+        file_folder_request_cnt--;
+        files_under_folder_lock.unlock();
     }
 	
 	close(fd);
@@ -578,8 +710,21 @@ set<int> get_new_master_idx_set(const set<int> &membership_set){
 }
 
 int hash_string(const string &str){
+    int last_underline_idx = -1;
+    for(int i=str.length()-1;i>=0;i--){
+        if(str[i] == '_'){
+            last_underline_idx = i;
+            break;
+        }
+    }
     unsigned int sum = 0;
-    for(auto s:str)sum = sum*19260817 + s;
+    if(last_underline_idx == -1){
+        for(auto s:str)sum = sum*19260817 + s;
+    } else {
+        for(int i=0;i<last_underline_idx;i++){
+            sum = sum*19260817 + str[i];
+        }
+    }
     return sum % 10;
 }
 
@@ -711,71 +856,133 @@ void deleteDirectoryContents(const std::filesystem::path& dir){
         std::filesystem::remove_all(entry.path());
 }
 
-/*
-int main(int argc, char *argv[]){
+void start_sdfs_service() {
     init_ip_list();
     deleteDirectoryContents("./sdfs_files/");
-    if(argc != 2){
-        puts("FATAL: please assign machine index!");
-        exit(0);
-    }
-    machine_idx = stoi(argv[1]) - 1;
-    start_time_ms = cur_time_in_ms();
+    system("mkdir ./sdfs_files/input");
     fsdfs_out.open( std::to_string(machine_idx + 1) + "_" + std::to_string(start_time_ms) +".log");
     start_membership_service(get_ip_address_from_index(machine_idx));
+    
     thread(sdfs_message_receiver).detach();
     thread(membership_listener).detach();
     thread(file_receiver).detach();
-    
-    string input;
-    while(cin>>input){
-        set<int> membership_set = get_current_live_membership_set();
-        if(input == "Get" || input == "get" || input == "G" || input == "g") {
-            string sdfsfilename;cin>>sdfsfilename;
-            string localfilename;cin>>localfilename;
-            // string to_print =  "Get command start: " + to_string(cur_time_in_ms());
-            // print_to_sdfs_log(to_print, true);
-            send_a_sdfs_message("G"+sdfsfilename+" "+localfilename+" "+to_string(machine_idx), find_master(membership_set, hash_string(sdfsfilename)));
-        } else if(input == "Put" || input == "put" || input == "P" || input == "p") {
-            string localfilename;cin>>localfilename;
-            string sdfsfilename;cin>>sdfsfilename;
-            // string to_print =  "Put command start: "+ to_string(cur_time_in_ms());
-            // print_to_sdfs_log(to_print, true);
-            thread(send_file, localfilename, sdfsfilename, find_master(membership_set, hash_string(sdfsfilename)), "P", false).detach();
-        } else if(input == "Delete" || input == "delete" || input == "D" || input == "d") {
-            string name;cin>>name;
-            send_a_sdfs_message("D"+name, find_master(membership_set, hash_string(name)));
-        } else if(input == "Store" || input == "store" || input == "S" || input == "s") {
-            print_current_files();
-        } else if(input == "ls" || input == "list") {
-            string file_name;cin>>file_name;
-            send_a_sdfs_message("L"+file_name+" "+to_string(machine_idx), find_master(membership_set, hash_string(file_name)));
-        } else if(input == "multiread" || input == "mr"){
-            string sdfsfilename;cin>>sdfsfilename;
-            string localfilename;cin>>localfilename;
-            int k;cin>>k;
-            for(int i=1;i<=k;i++){
-                int x;cin>>x;
-                x--;
-                if(!membership_set.count(x))continue;
-                thread(send_a_sdfs_message, "G"+sdfsfilename+" "+localfilename+" "+to_string(x), find_master(membership_set, hash_string(sdfsfilename))).detach();
-            }
-        } else if(input == "list_mem" || input == "member" || input == "mem"){
-            print_membership_list();
-        } else if(input == "list_self" || input == "self") {
-            cout << "machine index: " << machine_idx << endl;
-        } else if(input == "leave") {
-            return 0;
-        } else if(input == "CHANGE" || input == "C") {
-            local_mode_change();
-            print_current_mode();
-            group_mode_change();
-        } else if(input == "LOCAL" || input == "LOCALC" || input == "LOCALCHANGE"){
-            local_mode_change();
-            print_current_mode();
-        } else{
-            puts("Unsupported Command!");
-        }
-    }
 }
-*/
+
+vector<string> get_files_from_folder(const string &prefix){
+    set<int> membership_list = get_current_live_membership_set();
+
+    files_under_folder_lock.lock();
+    files_under_folder.clear();
+    file_folder_request_cnt = membership_list.size();
+    files_under_folder_lock.unlock();
+
+    int64_t query_start_time_ms = cur_time_in_ms();
+
+    for(int member:membership_list) {
+        thread(send_a_sdfs_message, "F"+prefix, member).detach();
+    }
+
+    while(true) { // block until all live member response or timeout
+        // print_to_sdfs_log("time passed: " + to_string(cur_time_in_ms() - query_start_time_ms), true);
+        if(cur_time_in_ms() - query_start_time_ms >= 10000)break;
+        files_under_folder_lock.lock();
+        int request_cnt = file_folder_request_cnt;
+        files_under_folder_lock.unlock();
+        // print_to_sdfs_log( "request cnt: " + to_string(request_cnt), true);
+        if(request_cnt == 0)break;
+    }
+
+    files_under_folder_lock.lock();
+    auto res = files_under_folder;
+    files_under_folder_lock.unlock();
+    return res;
+}
+
+void wait_until_all_files_are_received() {
+    auto event_num = write_lock(); // block until all previous event are done
+    // do nothing
+    update_finish_event(event_num);
+}
+
+// int main(int argc, char *argv[]){
+//     init_ip_list();
+//     deleteDirectoryContents("./sdfs_files/");
+//     system("mkdir ./sdfs_files/input");
+//     if(argc != 2){
+//         puts("FATAL: please assign machine index!");
+//         exit(0);
+//     }
+//     machine_idx = stoi(argv[1]) - 1;
+//     start_time_ms = cur_time_in_ms();
+//     fsdfs_out.open( std::to_string(machine_idx + 1) + "_" + std::to_string(start_time_ms) +".log");
+//     start_membership_service(get_ip_address_from_index(machine_idx));
+//     thread(sdfs_message_receiver).detach();
+//     thread(membership_listener).detach();
+//     thread(file_receiver).detach();
+    
+//     string input;
+//     while(cin>>input){
+//         set<int> membership_set = get_current_live_membership_set();
+//         if(input == "Get" || input == "get" || input == "G" || input == "g") {
+//             string sdfsfilename;cin>>sdfsfilename;
+//             string localfilename;cin>>localfilename;
+//             // string to_print =  "Get command start: " + to_string(cur_time_in_ms());
+//             // print_to_sdfs_log(to_print, true);
+//             send_a_sdfs_message("G"+sdfsfilename+" "+localfilename+" "+to_string(machine_idx), find_master(membership_set, hash_string(sdfsfilename)));
+//         } else if(input == "Put" || input == "put" || input == "P" || input == "p") {
+//             string localfilename;cin>>localfilename;
+//             string sdfsfilename;cin>>sdfsfilename;
+//             // string to_print =  "Put command start: "+ to_string(cur_time_in_ms());
+//             // print_to_sdfs_log(to_print, true);
+//             thread(send_file, localfilename, sdfsfilename, find_master(membership_set, hash_string(sdfsfilename)), "P", false).detach();
+//         } else if(input == "Delete" || input == "delete" || input == "D" || input == "d") {
+//             string name;cin>>name;
+//             send_a_sdfs_message("D"+name, find_master(membership_set, hash_string(name)));
+//         } else if(input == "Store" || input == "store" || input == "S" || input == "s") {
+//             print_current_files();
+//         } else if(input == "ls" || input == "list") {
+//             string file_name;cin>>file_name;
+//             send_a_sdfs_message("L"+file_name+" "+to_string(machine_idx), find_master(membership_set, hash_string(file_name)));
+//         } else if(input == "multiread" || input == "mr"){
+//             string sdfsfilename;cin>>sdfsfilename;
+//             string localfilename;cin>>localfilename;
+//             int k;cin>>k;
+//             for(int i=1;i<=k;i++){
+//                 int x;cin>>x;
+//                 x--;
+//                 if(!membership_set.count(x))continue;
+//                 thread(send_a_sdfs_message, "G"+sdfsfilename+" "+localfilename+" "+to_string(x), find_master(membership_set, hash_string(sdfsfilename))).detach();
+//             }
+//         } else if(input == "list_mem" || input == "member" || input == "mem"){
+//             print_membership_list();
+//         } else if(input == "list_self" || input == "self") {
+//             cout << "machine index: " << machine_idx << endl;
+//         } else if(input == "leave") {
+//             return 0;
+//         } else if(input == "CHANGE" || input == "C") {
+//             local_mode_change();
+//             print_current_mode();
+//             group_mode_change();
+//         } else if(input == "LOCAL" || input == "LOCALC" || input == "LOCALCHANGE"){
+//             local_mode_change();
+//             print_current_mode();
+//         } else if(input == "Folder" || input == "F"){
+//             string prefix;cin>>prefix;
+//             auto res = get_files_from_folder(prefix);
+//             stringstream ss;
+//             ss << "get [";
+//             for(const string &file: res) {
+//                 ss << file << ",";
+//             }  
+//             ss << "] from folder " << prefix; 
+//             print_to_sdfs_log(ss.str(), true);
+//         } else if(input == "Combine" || input == "combine"){
+//             string prefix; cin>> prefix;
+//             for(const int target_index : membership_set) {
+//                 thread(send_a_sdfs_message, 'C' + prefix, target_index).detach();
+//             }
+//         } else{
+//             puts("Unsupported Command!");
+//         }
+//     }
+// }
