@@ -197,7 +197,7 @@ void command_queue_listener(){
         
         membership_set = get_current_live_membership_set();
         for(int member : membership_set)
-            send_a_sdfs_message("C" + cur_cmd, member);
+            send_a_sdfs_message("C" + info[3], member);
         
         print_to_mj_log("Finish processing command"  + cur_cmd, false);
     }
@@ -260,6 +260,8 @@ void work_maple_task(const string& cmd, int socket_num){
     }
     this_thread::sleep_for(chrono::milliseconds(500));
     wait_until_all_files_are_processed(files_to_be_sent);
+    // Still need to waiting for slave files to be transferred, large file might cause error here
+    this_thread::sleep_for(chrono::milliseconds(500)); 
     
     // send success (S message) to leader & delete temp files
     int nbytes;
