@@ -254,13 +254,20 @@ void work_maple_task(const string& cmd, int socket_num){
     // Put execution result
     vector<string> files_to_be_sent;
     for(auto pair : maple_result){
-        string filename = sdfs_intermediate_filename_prefix+"_"+pair.first+"_"+to_string(machine_idx + 1);
+        auto two_digit_index = [](int machine_idx) {
+            if(machine_idx <= 9){
+                return "0" + to_string(machine_idx);
+            } else {
+                return to_string(machine_idx);
+            }
+        };
+        string filename = sdfs_intermediate_filename_prefix+"_"+pair.first+"_"+two_digit_index(machine_idx + 1);
         thread(send_file, "./local_result/" + filename, filename, find_master(membership_set, hash_string(filename)), "P", false).detach();
         files_to_be_sent.push_back("./local_result/" + filename);
     }
     this_thread::sleep_for(chrono::milliseconds(500));
     wait_until_all_files_are_processed(files_to_be_sent);
-    // Still need to waiting for slave files to be transferred, large file might cause error here
+    // Still need to wait for slave files to be transferred, large file might cause error here
     this_thread::sleep_for(chrono::milliseconds(500)); 
     
     // send success (S message) to leader & delete temp files
