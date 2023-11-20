@@ -19,7 +19,7 @@ mutex remain_set_lock;
 
 void send_mj_message(const string& str, int target_index){
     string target_ip = get_ip_address_from_index(target_index);
-	print_to_mj_log("Send a message to " + to_string(target_index+1) + ": " + str, true);
+	print_to_mj_log("Send a message to " + to_string(target_index+1) + ": " + str, false);
     int fd;
 	if((fd=socket(AF_INET,SOCK_STREAM,0))<0){//create a socket
 		puts("[Error] TCP message sender build fail!");
@@ -158,9 +158,12 @@ void command_queue_listener(){
     // TODO: later need to deal with invalid command
     while(true){
         if(command_queue.empty()) continue;
-        
+
+        command_queue_lock.lock();
         string cur_cmd = command_queue.front();
         command_queue.pop();
+        command_queue_lock.unlock();
+        print_to_mj_log("Process a command"  + cur_cmd, false);
         set<int> membership_set = get_current_live_membership_set();
         vector<string> info;
         info = tokenize(cur_cmd, ' ');
@@ -193,32 +196,35 @@ void command_queue_listener(){
         membership_set = get_current_live_membership_set();
         for(int member : membership_set)
             send_a_sdfs_message("C" + cur_cmd, member);
-
+        
+        print_to_mj_log("Finish processing command"  + cur_cmd, false);
     }
 }
 
 void work_maple_task(const string& cmd, int socket_num){
     vector<string> info = tokenize(cmd, ' ');
-    system("mkdir ./input");
+    system("mkdir ./local_input");
     
     // get files from sdfs
     set<int> membership_set = get_current_live_membership_set();
     for(int i = 6; i < info.size(); i++){
-        thread(send_a_sdfs_message,"G"+info[i]+" "+"./input/"+info[i]+" "+to_string(machine_idx), find_master(membership_set, hash_string(info[i]))).detach();
+        thread(send_a_sdfs_message,"G"+info[i]+" "+"./local_input/"+info[i]+" "+to_string(machine_idx), find_master(membership_set, hash_string(info[i]))).detach();
     }
     wait_until_all_files_are_received();
+    print_to_mj_log("[worker]: All files are received", false);
     
     // call maple_exec
     string maple_exe = info[1];
-    system("mkdir ./result");
+    system("mkdir ./local_result");
     for(int i = 6; i < info.size(); i++){
-        string cmd = "./" + maple_exe + " ./input/" + info[i] + " >> ./result/temp_result";
+        string cmd = "./" + maple_exe + " ./local_input/" + info[i] + " >> ./local_result/temp_result";
         system(cmd.c_str());
     }
+    print_to_mj_log("[worker]: temp_result is generated", false);
 
     map<string, vector<string>> maple_result;
     
-    ifstream infile("./result/temp_result");
+    ifstream infile("./local_result/temp_result");
     string k, v;
     while (infile >> k >> v)
         maple_result[k].push_back(v);
@@ -227,18 +233,19 @@ void work_maple_task(const string& cmd, int socket_num){
     
     string sdfs_intermediate_filename_prefix = info[3];
     for(auto pair : maple_result){
-        ofstream outfile("./result/" + sdfs_intermediate_filename_prefix+"_"+pair.first+"_"+to_string(machine_idx));
+        ofstream outfile("./local_result/" + sdfs_intermediate_filename_prefix+"_"+pair.first+"_"+to_string(machine_idx + 1));
         for(string val : pair.second){
             outfile << val << endl;
         }
         outfile.close();
     }
+    print_to_mj_log("[worker]: output files are generated", false);
 
     // Put execution result
     vector<thread> sendTasks;
     for(auto pair : maple_result){
-        string filename = sdfs_intermediate_filename_prefix+"_"+pair.first+"_"+to_string(machine_idx);
-        sendTasks.push_back(thread(send_file, "./result/" + filename, filename, find_master(membership_set, hash_string(filename)), "P", false));
+        string filename = sdfs_intermediate_filename_prefix+"_"+pair.first+"_"+to_string(machine_idx + 1);
+        sendTasks.push_back(thread(send_file, "./local_result/" + filename, filename, find_master(membership_set, hash_string(filename)), "P", false));
     }
 
     for (thread & th : sendTasks)
@@ -251,10 +258,11 @@ void work_maple_task(const string& cmd, int socket_num){
         puts("[ERROR] Socket write fail!");
         return;
     }
-    deleteDirectoryContents("./result/");
-    deleteDirectoryContents("./input/");
-    system("rm ./result");
-    system("rm ./input");
+
+    print_to_mj_log("[worker]: output files successfully sent", false);
+
+    system("rm -rf ./local_result");
+    system("rm -rf ./local_input");
 
 }
 
@@ -271,9 +279,9 @@ void maple_task_monitor(const string& cmd, const vector<string>& files){
         string cur_cmd = "m" + cmd + " " + to_string(files.size());
         for(string file : files)
             cur_cmd += (" " +  file);
-
+        
+        print_to_mj_log("[leader]: distribute \"" + cur_cmd + "\" to worker " + to_string(target_index + 1), false);
         string target_ip = get_ip_address_from_index(target_index);
-        print_to_mj_log("Send a message to " + to_string(target_index + 1) + ": " + cur_cmd, true);
         
         int fd;
         if((fd=socket(AF_INET,SOCK_STREAM,0))<0){
@@ -307,9 +315,11 @@ void maple_task_monitor(const string& cmd, const vector<string>& files){
         finished_task_lock.lock();
         finished_task++;
         finished_task_lock.unlock();
+        print_to_mj_log("worker " + to_string(target_index + 1) + " has finished the task", false);
     }
     catch(runtime_error &e){
         thread(maple_task_monitor, cmd, files).detach();   
+        print_to_mj_log("[leader]: restart maple_task_monitor", false);
     }
 }
 
@@ -335,6 +345,7 @@ int main(int argc, char *argv[]){
     
     start_sdfs_service();
     thread(mj_message_receiver).detach();
+    if(machine_idx == 0) thread(command_queue_listener).detach();
     
     string input;
     while(cin>>input){
