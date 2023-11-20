@@ -209,13 +209,15 @@ void work_maple_task(const string& cmd, int socket_num){
     
     // get files from sdfs
     set<int> membership_set = get_current_live_membership_set();
+    vector<string> files_to_be_got;
     for(int i = 6; i < info.size(); i++){
         vector<string> file_path = tokenize(info[i], '/');
         string file_name = file_path.back();
         send_a_sdfs_message("G"+info[i]+" "+"./local_input/"+file_name+" "+to_string(machine_idx), find_master(membership_set, hash_string(info[i])));
+        files_to_be_got.push_back("./local_input/"+file_name);
     }
     this_thread::sleep_for(chrono::milliseconds(500));
-    wait_until_all_files_are_processed();
+    wait_until_all_files_are_processed(files_to_be_got);
     print_to_mj_log("[worker]: All files are received", false);
     
     // call maple_exec
@@ -250,13 +252,14 @@ void work_maple_task(const string& cmd, int socket_num){
     print_to_mj_log("[worker]: output files are generated", false);
 
     // Put execution result
-    vector<thread> sendTasks;
+    vector<string> files_to_be_sent;
     for(auto pair : maple_result){
         string filename = sdfs_intermediate_filename_prefix+"_"+pair.first+"_"+to_string(machine_idx + 1);
         thread(send_file, "./local_result/" + filename, filename, find_master(membership_set, hash_string(filename)), "P", false).detach();
+        files_to_be_sent.push_back("./local_result/" + filename);
     }
     this_thread::sleep_for(chrono::milliseconds(500));
-    wait_until_all_files_are_processed();
+    wait_until_all_files_are_processed(files_to_be_sent);
     
     // send success (S message) to leader & delete temp files
     int nbytes;
