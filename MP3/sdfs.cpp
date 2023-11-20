@@ -900,11 +900,13 @@ vector<string> get_files_under_folder(const string &prefix){
     return res;
 }
 
-void wait_until_all_files_are_received() {
+void wait_until_all_files_are_processed(const vector<string> &files) {
     // TO BE DONE
-    // auto event_num = write_lock(); // block until all previous event are done
-    // // do nothing
-    // update_finish_event(event_num);
+    for(const string& file : files) { // block until all previous event are done
+        auto event_num = write_lock(file);
+        //do nothing
+        update_finish_event(event_num, file);
+    }
 }
 
 int main(int argc, char *argv[]){

@@ -39,4 +39,4 @@ void start_sdfs_service();
 
 vector<string> get_files_under_folder(const string &prefix);
 
-void wait_until_all_files_are_received();
+void wait_until_all_files_are_processed(const vector<string> &files);
