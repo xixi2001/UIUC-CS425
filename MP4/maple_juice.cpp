@@ -186,7 +186,7 @@ void command_queue_listener(){
             thread(maple_task_monitor, cur_cmd, mission_partitions[i]).detach();   
         }
 
-        // TODO: count # of finished task, after all maple tasks have finished, send "C" message 
+        // count # of finished task, after all maple tasks have finished, send "C" message 
         while(finished_task != num_tasks)
             continue;
         
@@ -222,14 +222,40 @@ void work_maple_task(const string& cmd, int socket_num){
     string k, v;
     while (infile >> k >> v)
         maple_result[k].push_back(v);
-    
-    for(auto pair : maple_result){
 
+    infile.close();
+    
+    string sdfs_intermediate_filename_prefix = info[3];
+    for(auto pair : maple_result){
+        ofstream outfile("./result/" + sdfs_intermediate_filename_prefix+"_"+pair.first+"_"+to_string(machine_idx));
+        for(string val : pair.second){
+            outfile << val << endl;
+        }
+        outfile.close();
     }
 
-
     // Put execution result
+    vector<thread> sendTasks;
+    for(auto pair : maple_result){
+        string filename = sdfs_intermediate_filename_prefix+"_"+pair.first+"_"+to_string(machine_idx);
+        sendTasks.push_back(thread(send_file, "./result/" + filename, filename, find_master(membership_set, hash_string(filename)), "P", false));
+    }
+
+    for (thread & th : sendTasks)
+            th.join();
+    
     // send success (S message) to leader & delete temp files
+    int nbytes;
+    string res = "S";
+    if((nbytes=send(socket_num, res.c_str(), res.size(), 0))<0){ 
+        puts("[ERROR] Socket write fail!");
+        return;
+    }
+    deleteDirectoryContents("./result/");
+    deleteDirectoryContents("./input/");
+    system("rm ./result");
+    system("rm ./input");
+
 }
 
 

@@ -1,6 +1,7 @@
 #ifndef _SDFS_H
 #define _SDFS_H
 #include "membership.h"
+#include <filesystem>
 #include <set>
 using namespace std;
 
@@ -45,5 +46,7 @@ void start_sdfs_service();
 void get_machine_id();
 
 void wait_until_all_files_are_received();
+
+void deleteDirectoryContents(const std::filesystem::path& dir);
 
 #endif
