@@ -323,12 +323,13 @@ void work_juice_task(const string& cmd, int socket_num){
     };
     
     // call juice_exec
+    string sdfs_dest_filename = info[4];
     string juice_exe = info[1];
     system("mkdir ./local_result_juice");
     for(int i = 7; i < info.size(); i++){
         string file_name = info[i];
-        string cmd = "cat " + file_name + " | " + "./" + juice_exe 
-            + " >> ./local_result_juice/result_" + two_digit_index(machine_idx);
+        string cmd = "cat ./local_input_juice/" + file_name + " | " + "./" + juice_exe 
+            + " >> ./local_result_juice/"+sdfs_dest_filename+"_" + two_digit_index(machine_idx);
         print_to_mj_log("Execute: " + cmd, true);
         system(cmd.c_str());
     }
@@ -336,7 +337,7 @@ void work_juice_task(const string& cmd, int socket_num){
 
     // Put execution result
     vector<string> files_to_be_sent;
-    string filename = "result_" + two_digit_index(machine_idx);
+    string filename = sdfs_dest_filename + "_" + two_digit_index(machine_idx);
     thread(send_file, "./local_result_juice/" + filename, filename, find_master(membership_set, hash_string(filename, true)), "P", false).detach();
     files_to_be_sent.push_back("./local_result_juice/" + filename);
     
