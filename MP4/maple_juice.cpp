@@ -362,8 +362,8 @@ void work_juice_task(const string& cmd, int socket_num){
 
     print_to_mj_log("[worker]: juice result successfully sent", false);
 
-    // system("rm -rf ./local_result_juice");
-    // system("rm -rf ./local_input_juice");
+    system("rm -rf ./local_result_juice");
+    system("rm -rf ./local_input_juice");
 }
 
 
