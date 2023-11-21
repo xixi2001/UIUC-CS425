@@ -27,7 +27,7 @@ set<int> get_new_slave_idx_set(const set<int> &membership_set);
 
 set<int> get_new_master_idx_set(const set<int> &membership_set);
 
-int hash_string(const string &str);
+int hash_string(const string &str, bool prefix);
 
 int find_master(const set<int> &membership_set, int hash_value);// give the hash value, find corresponding master
 

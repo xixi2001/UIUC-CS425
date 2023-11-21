@@ -710,23 +710,32 @@ set<int> get_new_master_idx_set(const set<int> &membership_set){
     return res;
 }
 
-int hash_string(const string &str){
-    int last_underline_idx = -1;
-    for(int i=str.length()-1;i>=0;i--){
-        if(str[i] == '_'){
-            last_underline_idx = i;
-            break;
+int hash_string(const string &str, bool prefix){
+    if(prefix){
+        int last_underline_idx = -1;
+        for(int i=str.length()-1;i>=0;i--){
+            if(str[i] == '_'){
+                last_underline_idx = i;
+                break;
+            }
         }
+        unsigned int sum = 0;
+        if(last_underline_idx == -1){
+            for(auto s:str)sum = sum*19260817 + s;
+        } else {
+            for(int i=0;i<last_underline_idx;i++){
+                sum = sum*19260817 + str[i];
+            }
+        }
+        return sum % 10;
     }
-    unsigned int sum = 0;
-    if(last_underline_idx == -1){
+    else{
+        unsigned int sum = 0;
         for(auto s:str)sum = sum*19260817 + s;
-    } else {
-        for(int i=0;i<last_underline_idx;i++){
-            sum = sum*19260817 + str[i];
-        }
+        return sum % 10;
     }
-    return sum % 10;
+    
+    
 }
 
 int find_master(const set<int> &membership_set, int hash_value){
@@ -748,7 +757,7 @@ void handle_crash(int crash_idx, const set<int> &new_membership_set, const set<i
             slave_files_lock.unlock();
             
             for(string slave_file : slave_files_temp){
-                if(find_master(new_membership_set, hash_string(slave_file)) == machine_idx){
+                if(find_master(new_membership_set, hash_string(slave_file, true)) == machine_idx){
                     slave_to_master_file.push_back(slave_file);
                     
                     master_files_lock.lock();
@@ -789,7 +798,7 @@ void handle_join(int join_idx, const set<int> &new_membership_set, const set<int
         vector<string> master_file_to_delete;
         master_files_lock.lock();
         for(string master_file : master_files){
-            if(find_master(new_membership_set, hash_string(master_file)) == join_idx){
+            if(find_master(new_membership_set, hash_string(master_file, true)) == join_idx){
                 thread(send_file, master_file, master_file, join_idx, "P", true).detach();
                 master_file_to_delete.push_back(master_file);
             }
@@ -812,7 +821,7 @@ void handle_join(int join_idx, const set<int> &new_membership_set, const set<int
     
     slave_files_lock.lock();
     for(string slave_file : slave_files){
-        if(new_masters.find(find_master(new_membership_set, hash_string(slave_file))) 
+        if(new_masters.find(find_master(new_membership_set, hash_string(slave_file, true))) 
                 == new_masters.end())
             slave_file_to_delete.push_back(slave_file);
     }
