@@ -103,6 +103,12 @@ void mj_message_receiver(){
             case 'm':
                 work_maple_task(msg_str, clifd);
                 break;
+            case 'J':
+                command_queue.push(msg);
+                break;
+            case 'j':
+                work_juice_task(msg_str, clifd);
+                break;
             default:
                 puts("Message is in wrong format.");
                 throw runtime_error("Message is in wrong format.");
@@ -157,7 +163,7 @@ int finished_task;
 mutex finished_task_lock; 
 
 void command_queue_listener(){
-    // TODO: later need to deal with invalid command
+    // TODO: later probably need to deal with invalid command
     while(true){
         if(command_queue.empty()) continue;
 
@@ -170,7 +176,12 @@ void command_queue_listener(){
         vector<string> info;
         info = tokenize(cur_cmd, ' ');
         
-        vector<string> files = get_files_from_folder(info[4]);
+        vector<string> files;
+        if(cur_cmd[0] == 'M') 
+            files = get_files_from_folder(info[4]);
+        else if(cur_cmd[0] == 'J')
+           files = get_files_from_folder(info[3] + "_");
+        
         vector<vector<string>> mission_partitions;
         int num_tasks = stoi(info[2]);
         if(num_tasks > membership_set.size())
@@ -182,30 +193,32 @@ void command_queue_listener(){
         else
             mission_partitions = range_based_partition(files, num_tasks, membership_set);
         
-        // initiate maple_task_monitor
+        // initiate task_monitor
         remain_set = membership_set;
         finished_task_lock.lock();
         finished_task = 0;
         finished_task_lock.unlock();
         for(int i = 0; i < num_tasks; i++){
-            thread(maple_task_monitor, cur_cmd, mission_partitions[i]).detach();   
+            thread(task_monitor, cur_cmd, mission_partitions[i]).detach();   
         }
 
         // count # of finished task, after all maple tasks have finished, send "C" message 
         while(finished_task != num_tasks)
             continue;
         
+
         membership_set = get_current_live_membership_set();
         for(int member : membership_set)
             send_a_sdfs_message("C" + info[3], member);
-        
+
         print_to_mj_log("Finish processing command"  + cur_cmd, false);
     }
 }
 
+
 void work_maple_task(const string& cmd, int socket_num){
     vector<string> info = tokenize(cmd, ' ');
-    system("mkdir ./local_input");
+    system("mkdir ./local_input_maple");
     
     // get files from sdfs
     set<int> membership_set = get_current_live_membership_set();
@@ -213,8 +226,8 @@ void work_maple_task(const string& cmd, int socket_num){
     for(int i = 6; i < info.size(); i++){
         vector<string> file_path = tokenize(info[i], '/');
         string file_name = file_path.back();
-        send_a_sdfs_message("G"+info[i]+" "+"./local_input/"+file_name+" "+to_string(machine_idx), find_master(membership_set, hash_string(info[i])));
-        files_to_be_got.push_back("./local_input/"+file_name);
+        send_a_sdfs_message("G"+info[i]+" "+"./local_input_maple/"+file_name+" "+to_string(machine_idx), find_master(membership_set, hash_string(info[i])));
+        files_to_be_got.push_back("./local_input_maple/"+file_name);
     }
     this_thread::sleep_for(chrono::milliseconds(500));
     wait_until_all_files_are_processed(files_to_be_got);
@@ -222,11 +235,11 @@ void work_maple_task(const string& cmd, int socket_num){
     
     // call maple_exec
     string maple_exe = info[1];
-    system("mkdir ./local_result");
+    system("mkdir ./local_result_maple");
     for(int i = 6; i < info.size(); i++){
         vector<string> file_path = tokenize(info[i], '/');
         string file_name = file_path.back();
-        string cmd = "./" + maple_exe + " ./local_input/" + file_name + " >> ./local_result/temp_result";
+        string cmd = "./" + maple_exe + " ./local_input_maple/" + file_name + " >> ./local_result_maple/temp_result";
         print_to_mj_log("Execute: " + cmd, true);
         system(cmd.c_str());
     }
@@ -234,7 +247,7 @@ void work_maple_task(const string& cmd, int socket_num){
 
     map<string, vector<string>> maple_result;
     
-    ifstream infile("./local_result/temp_result");
+    ifstream infile("./local_result_maple/temp_result");
     string k, v;
     while (infile >> k >> v)
         maple_result[k].push_back(v);
@@ -249,9 +262,9 @@ void work_maple_task(const string& cmd, int socket_num){
     };
     string sdfs_intermediate_filename_prefix = info[3];
     for(auto pair : maple_result){
-        ofstream outfile("./local_result/" + sdfs_intermediate_filename_prefix+"_"+pair.first+"_"+two_digit_index(machine_idx + 1));
+        ofstream outfile("./local_result_maple/" + sdfs_intermediate_filename_prefix+"_"+pair.first+"_"+two_digit_index(machine_idx + 1));
         for(string val : pair.second){
-            outfile << val << endl;
+            outfile << pair.first << " " << val << endl;
         }
         outfile.close();
     }
@@ -261,8 +274,8 @@ void work_maple_task(const string& cmd, int socket_num){
     vector<string> files_to_be_sent;
     for(auto pair : maple_result){
         string filename = sdfs_intermediate_filename_prefix+"_"+pair.first+"_"+two_digit_index(machine_idx + 1);
-        thread(send_file, "./local_result/" + filename, filename, find_master(membership_set, hash_string(filename)), "P", false).detach();
-        files_to_be_sent.push_back("./local_result/" + filename);
+        thread(send_file, "./local_result_maple/" + filename, filename, find_master(membership_set, hash_string(filename)), "P", false).detach();
+        files_to_be_sent.push_back("./local_result_maple/" + filename);
     }
     this_thread::sleep_for(chrono::milliseconds(500));
     wait_until_all_files_are_processed(files_to_be_sent);
@@ -279,13 +292,74 @@ void work_maple_task(const string& cmd, int socket_num){
 
     print_to_mj_log("[worker]: output files successfully sent", false);
 
-    system("rm -rf ./local_result");
-    system("rm -rf ./local_input");
+    system("rm -rf ./local_result_maple");
+    system("rm -rf ./local_input_maple");
 
 }
 
+void work_juice_task(const string& cmd, int socket_num){
+    vector<string> info = tokenize(cmd, ' ');
+    system("mkdir ./local_input_juice");
+    
+    // get files from sdfs
+    set<int> membership_set = get_current_live_membership_set();
+    vector<string> files_to_be_got;
+    for(int i = 7; i < info.size(); i++){
+        string file_name = info[i];
+        send_a_sdfs_message("G"+info[i]+" "+"./local_input_juice/"+file_name+" "+to_string(machine_idx), find_master(membership_set, hash_string(info[i])));
+        files_to_be_got.push_back("./local_input_juice/"+file_name);
+    }
+    this_thread::sleep_for(chrono::milliseconds(500));
+    wait_until_all_files_are_processed(files_to_be_got);
+    print_to_mj_log("[worker]: All files are received", false);
 
-void maple_task_monitor(const string& cmd, const vector<string>& files){
+    auto two_digit_index = [](int machine_idx) {
+        if(machine_idx <= 9){
+            return "0" + to_string(machine_idx);
+        } else {
+            return to_string(machine_idx);
+        }
+    };
+    
+    // call juice_exec
+    string juice_exe = info[1];
+    system("mkdir ./local_result_juice");
+    for(int i = 7; i < info.size(); i++){
+        string file_name = info[i];
+        string cmd = "cat " + file_name + " | " + "./" + juice_exe 
+            + " >> ./local_result_juice/result_" + two_digit_index(machine_idx);
+        print_to_mj_log("Execute: " + cmd, true);
+        system(cmd.c_str());
+    }
+    print_to_mj_log("[worker]: result is generated", false);
+
+    // Put execution result
+    vector<string> files_to_be_sent;
+    string filename = "result_" + two_digit_index(machine_idx);
+    thread(send_file, "./local_result_juice/" + filename, filename, find_master(membership_set, hash_string(filename)), "P", false).detach();
+    files_to_be_sent.push_back("./local_result_juice/" + filename);
+    
+    this_thread::sleep_for(chrono::milliseconds(500));
+    wait_until_all_files_are_processed(files_to_be_sent);
+    // Still need to wait for slave files to be transferred, large file might cause error here
+    this_thread::sleep_for(chrono::milliseconds(500)); 
+    
+    // send success (S message) to leader & delete temp files
+    int nbytes;
+    string res = "S";
+    if((nbytes=send(socket_num, res.c_str(), res.size(), 0))<0){ 
+        puts("[ERROR] Socket write fail!");
+        return;
+    }
+
+    print_to_mj_log("[worker]: juice result successfully sent", false);
+
+    system("rm -rf ./local_result_juice");
+    system("rm -rf ./local_input_juice");
+}
+
+
+void task_monitor(const string& cmd, const vector<string>& files){
     try{
         remain_set_lock.lock();
         if(remain_set.size() == 0) 
@@ -294,7 +368,12 @@ void maple_task_monitor(const string& cmd, const vector<string>& files){
         remain_set.erase(target_index);
         remain_set_lock.unlock();
 
-        string cur_cmd = "m" + cmd + " " + to_string(files.size());
+        string cur_cmd;
+        if(cmd[0] == 'M') 
+            cur_cmd = "m" + cmd + " " + to_string(files.size());
+        else if(cmd[0] == 'J')
+            cur_cmd = "j" + cmd + " " + to_string(files.size());
+
         for(string file : files)
             cur_cmd += (" " +  file);
         
@@ -336,8 +415,8 @@ void maple_task_monitor(const string& cmd, const vector<string>& files){
         print_to_mj_log("worker " + to_string(target_index + 1) + " has finished the task", false);
     }
     catch(runtime_error &e){
-        thread(maple_task_monitor, cmd, files).detach();   
-        print_to_mj_log("[leader]: restart maple_task_monitor", false);
+        thread(task_monitor, cmd, files).detach();   
+        print_to_mj_log("[leader]: restart task_monitor", false);
     }
 }
 
@@ -392,9 +471,21 @@ int main(int argc, char *argv[]){
             string to_print =  "Get command start: " + to_string(cur_time_in_ms());
             print_to_sdfs_log(to_print, true);
             send_mj_message("M " + maple_exe + " " + num_maples + " " + sdfs_intermediate_filename_prefix + " " + sdfs_src_directory, 0);
+        } else if(input == "juice" || input == "Juice" || input == "J" || input == "j") {
+            string juice_exe;cin>>juice_exe;
+            string num_juices;cin>>num_juices;
+            string sdfs_intermediate_filename_prefix;cin>>sdfs_intermediate_filename_prefix;
+            string sdfs_dest_filename;cin>>sdfs_dest_filename;
+            string delete_input;cin>>delete_input;
+            string to_print =  "Get command start: " + to_string(cur_time_in_ms());
+            print_to_sdfs_log(to_print, true);
+            send_mj_message("J " + juice_exe + " " + num_juices + " " + sdfs_intermediate_filename_prefix
+                 + " " + sdfs_dest_filename + " " + delete_input, 0);
         }
     }
 }
+
+
 // put A input/A
 // put B input/B
 // put C input/C
