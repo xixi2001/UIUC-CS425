@@ -208,8 +208,14 @@ void command_queue_listener(){
         
 
         membership_set = get_current_live_membership_set();
-        for(int member : membership_set)
-            send_a_sdfs_message("C" + info[3], member);
+        if(cur_cmd[0] == 'M'){
+            for(int member : membership_set)
+                send_a_sdfs_message("C" + info[3], member);
+        }
+        else if(cur_cmd[0] == 'J'){
+            for(int member : membership_set)
+                send_a_sdfs_message("C" + info[4], member);
+        }
 
         print_to_mj_log("Finish processing command"  + cur_cmd, false);
     }
@@ -492,5 +498,5 @@ int main(int argc, char *argv[]){
 // put B input/B
 // put C input/C
 // maple maple_test 3 wc input/
-// juice juice_test 3 wc wc_result 0
+// juice juice_test 3 wc wcResult 0
 
