@@ -6,7 +6,7 @@ CXXFLAGS_FILESYSTEM = -lstdc++fs
 all: maple_juice
 
 maple_juice: membership.cpp sdfs.cpp maple_juice.cpp
-	$(CXX) $(CXXFLAGS) membership.cpp sdfs.cpp maple_juice.cpp $(CXXFLAGS_THREAD) $(CXXFLAGS_FILESYSTEM) -o maple_juice
+	$(CXX) $(CXXFLAGS) membership.cpp sdfs.cpp maple_juice.cpp $(CXXFLAGS_THREAD) $(CXXFLAGS_FILESYSTEM) -o mj
 
 clean:
 	rm -rf sdfs_files

@@ -221,7 +221,7 @@ void merge_all_files_with_common_prefix(const string& prefix) {
     master_files_lock.lock();
     map<string, vector<string> > file_bucket;
     for(const string& str:master_files) {
-        if(is_prefix(str, prefix)) {
+        if(is_prefix(str, prefix + "_")) {
             const string prefix_key = str.substr(0, str.size() - 3);
             if(!file_bucket.count(prefix_key)) {
                 file_bucket.emplace(prefix_key, vector<string>({}));
@@ -239,7 +239,7 @@ void merge_all_files_with_common_prefix(const string& prefix) {
     slave_files_lock.lock();
     file_bucket.clear();
     for(const string& str:slave_files) {
-        if(is_prefix(str, prefix)) {
+        if(is_prefix(str, prefix + "_")) {
             const string prefix_key = str.substr(0, str.size() - 3);
             if(!file_bucket.count(prefix_key)) {
                 file_bucket.emplace(prefix_key, vector<string>({}));
