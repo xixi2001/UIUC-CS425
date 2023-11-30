@@ -225,11 +225,17 @@ void command_queue_listener(){
 void work_maple_task(const string& cmd, int socket_num){
     vector<string> info = tokenize(cmd, ' ');
     system("mkdir ./local_input_maple");
+
+    int cmd_para_size = stoi(info[6]);string cmd_para;
+    for(int i = 7; i < 7 + cmd_para_size; i++){
+        cmd_para += info[i] + " ";
+    }
+    print_to_mj_log("Maple task parameter: " + cmd_para , false);
     
     // get files from sdfs
     set<int> membership_set = get_current_live_membership_set();
     vector<string> files_to_be_got;
-    for(int i = 6; i < info.size(); i++){
+    for(int i = 7 + cmd_para_size; i < info.size(); i++){
         vector<string> file_path = tokenize(info[i], '/');
         string file_name = file_path.back();
         send_a_sdfs_message("G"+info[i]+" "+"./local_input_maple/"+file_name+" "+to_string(machine_idx), 
@@ -243,10 +249,10 @@ void work_maple_task(const string& cmd, int socket_num){
     // call maple_exec
     string maple_exe = info[1];
     system("mkdir ./local_result_maple");
-    for(int i = 6; i < info.size(); i++){
+    for(int i = 7 + cmd_para_size; i < info.size(); i++){
         vector<string> file_path = tokenize(info[i], '/');
         string file_name = file_path.back();
-        string cmd = "./" + maple_exe + " ./local_input_maple/" + file_name + " >> ./local_result_maple/temp_result";
+        string cmd = "./" + maple_exe + " ./local_input_maple/" + file_name + " " + cmd_para + " >> ./local_result_maple/temp_result";
         print_to_mj_log("Execute: " + cmd, true);
         system(cmd.c_str());
     }
@@ -307,11 +313,17 @@ void work_maple_task(const string& cmd, int socket_num){
 void work_juice_task(const string& cmd, int socket_num){
     vector<string> info = tokenize(cmd, ' ');
     system("mkdir ./local_input_juice");
+
+    int cmd_para_size = stoi(info[7]);string cmd_para;
+    for(int i = 8; i < 8 + cmd_para_size; i++){
+        cmd_para += info[i] + " ";
+    }
+    print_to_mj_log("Juice task parameter: " + cmd_para, false);
     
     // get files from sdfs
     set<int> membership_set = get_current_live_membership_set();
     vector<string> files_to_be_got;
-    for(int i = 7; i < info.size(); i++){
+    for(int i = 8 + cmd_para_size; i < info.size(); i++){
         string file_name = info[i];
         send_a_sdfs_message("G"+info[i]+" "+"./local_input_juice/"+file_name+" "+to_string(machine_idx), find_master(membership_set, hash_string(info[i], false)));
         files_to_be_got.push_back("./local_input_juice/"+file_name);
@@ -332,9 +344,10 @@ void work_juice_task(const string& cmd, int socket_num){
     string sdfs_dest_filename = info[4];
     string juice_exe = info[1];
     system("mkdir ./local_result_juice");
-    for(int i = 7; i < info.size(); i++){
+    for(int i = 8 + cmd_para_size; i < info.size(); i++){
         string file_name = info[i];
-        string cmd = "cat ./local_input_juice/" + file_name + " | " + "./" + juice_exe 
+        string cmd = "cat ./local_input_juice/" + file_name + " | " + "./" + juice_exe
+            + " " + cmd_para
             + " >> ./local_result_juice/"+sdfs_dest_filename+"_" + two_digit_index(machine_idx);
         print_to_mj_log("Execute: " + cmd, true);
         system(cmd.c_str());
@@ -452,43 +465,59 @@ int main(int argc, char *argv[]){
     thread(mj_message_receiver).detach();
     if(machine_idx == 0) thread(command_queue_listener).detach();
     
-    string input;
-    while(cin>>input){
+    string input_line;
+    while(getline(cin, input_line)){
         set<int> membership_set = get_current_live_membership_set();
+        stringstream ss(input_line);
+        string input;ss >> input;
         if(input == "Get" || input == "get" || input == "G" || input == "g") {
-            string sdfsfilename;cin>>sdfsfilename;
-            string localfilename;cin>>localfilename;
+            string sdfsfilename;ss>>sdfsfilename;
+            string localfilename;ss>>localfilename;
             send_a_sdfs_message("G"+sdfsfilename+" "+localfilename+" "+to_string(machine_idx), find_master(membership_set, hash_string(sdfsfilename, true)));
         } else if(input == "Put" || input == "put" || input == "P" || input == "p") {
-            string localfilename;cin>>localfilename;
-            string sdfsfilename;cin>>sdfsfilename;
+            string localfilename;ss>>localfilename;
+            string sdfsfilename;ss>>sdfsfilename;
             thread(send_file, localfilename, sdfsfilename, find_master(membership_set, hash_string(sdfsfilename, true)), "P", false).detach();
         } else if(input == "Delete" || input == "delete" || input == "D" || input == "d") {
-            string name;cin>>name;
+            string name;ss>>name;
             send_a_sdfs_message("D"+name, find_master(membership_set, hash_string(name, true)));
         } else if(input == "Store" || input == "store" || input == "S" || input == "s") {
             print_current_files();
         } else if(input == "ls" || input == "list") {
-            string file_name;cin>>file_name;
+            string file_name;ss>>file_name;
             send_a_sdfs_message("L"+file_name+" "+to_string(machine_idx), find_master(membership_set, hash_string(file_name, true)));
         } else if(input == "maple" || input == "Maple" || input == "M" || input == "m") {
-            string maple_exe;cin>>maple_exe;
-            string num_maples;cin>>num_maples;
-            string sdfs_intermediate_filename_prefix;cin>>sdfs_intermediate_filename_prefix;
-            string sdfs_src_directory;cin>>sdfs_src_directory;
+            string maple_exe;ss>>maple_exe;
+            string num_maples;ss>>num_maples;
+            string sdfs_intermediate_filename_prefix;ss>>sdfs_intermediate_filename_prefix;
+            string sdfs_src_directory;ss>>sdfs_src_directory;
             string to_print =  "Get command start: " + to_string(cur_time_in_ms());
             print_to_sdfs_log(to_print, true);
             send_mj_message("M " + maple_exe + " " + num_maples + " " + sdfs_intermediate_filename_prefix + " " + sdfs_src_directory, 0);
         } else if(input == "juice" || input == "Juice" || input == "J" || input == "j") {
-            string juice_exe;cin>>juice_exe;
-            string num_juices;cin>>num_juices;
-            string sdfs_intermediate_filename_prefix;cin>>sdfs_intermediate_filename_prefix;
-            string sdfs_dest_filename;cin>>sdfs_dest_filename;
-            string delete_input;cin>>delete_input;
+            string juice_exe;ss>>juice_exe;
+            string num_juices;ss>>num_juices;
+            string sdfs_intermediate_filename_prefix;ss>>sdfs_intermediate_filename_prefix;
+            string sdfs_dest_filename;ss>>sdfs_dest_filename;
+            string delete_input;ss>>delete_input;
             string to_print =  "Get command start: " + to_string(cur_time_in_ms());
             print_to_sdfs_log(to_print, true);
             send_mj_message("J " + juice_exe + " " + num_juices + " " + sdfs_intermediate_filename_prefix
                  + " " + sdfs_dest_filename + " " + delete_input, 0);
+        } else if(input == "SELECT" || input == "select") {
+            vector<string> sql = tokenize(input_line, ' ');
+            string regex_command;int regex_size = 0;
+            for(int i=5; i+1 < sql.size();i+=3){
+                regex_size += 2;
+                regex_command += sql[i] + " " + sql[i+1];
+            }
+                
+            print_to_mj_log("regex: " + regex_command, true);
+            send_mj_message("M maple_sql 1 sql "+ sql[3] + 
+                to_string(regex_size) + " " + regex_command, 0);
+            send_mj_message("J juice_sql 1 sql sqlResult 0 0", 0);
+        } else {
+            puts("Unsupported command!");
         }
     }
 }
