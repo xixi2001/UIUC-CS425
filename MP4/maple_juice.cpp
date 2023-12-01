@@ -534,7 +534,7 @@ int main(int argc, char *argv[]){
             string file_name, target;
             ss >> file_name >> target;
             send_mj_message("M maple_test 1 detect "+ file_name + " 1 " + target, 0);
-            send_mj_message("J juice_test 1 detect detectResult 0 0", 0);
+            send_mj_message("J juice_test 1 detect output_detect_result 1 0", 0);
         } else {
             puts("Unsupported command!");
         }
