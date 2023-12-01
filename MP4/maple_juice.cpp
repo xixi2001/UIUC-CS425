@@ -216,6 +216,10 @@ void command_queue_listener(){
             for(int member : membership_set)
                 send_a_sdfs_message("C" + info[4], member);
         }
+        if(cur_cmd[0] == 'J' && info[5] == "1"){//Delete juice input file
+            for(string filename : files)
+                thread(send_a_sdfs_message, "D" + filename, find_master(membership_set, hash_string(filename, false))).detach();
+        }
 
         print_to_mj_log("Finish processing command"  + cur_cmd, false);
     }
