@@ -267,15 +267,16 @@ void work_maple_task(const string& cmd, int socket_num){
     ifstream infile("./local_result_maple/temp_result");
     string input_line;
     while(getline(infile, input_line)) {
-        vector<string> tmp = tokenize(input_line, ' ');
-        string k = tmp[0];
-        string v;
-        if(tmp.size() >= 2) {
-            v = tmp[1];
-            for(int i=2;i<tmp.size(); i++)
-                v = ' ' + tmp[i];
+        string k,v;
+        for(int i=0;i<input_line.size();i++) {
+            if(input_line[i] == ' ') {
+                if(input_line[i+1] == ' ')i++;
+                k = input_line.substr(0, i);
+                v = input_line.substr(i+1);
+                maple_result[k].push_back(v);
+                break;
+            }
         }
-        maple_result[k].push_back(v);
     }
 
     infile.close();
@@ -519,16 +520,24 @@ int main(int argc, char *argv[]){
                  + " " + sdfs_dest_filename + " " + delete_input, 0);
         } else if(input == "SELECT" || input == "select") {
             vector<string> sql = tokenize(input_line, ' ');
-            string regex_command;int regex_size = 0;
-            for(int i=5; i+1 < sql.size();i+=3){
-                regex_size += 2;
-                regex_command += sql[i] + " " + sql[i+1];
+            if(sql[4] == "WHERE") {// Filter
+                string regex_command;int regex_size = 0;
+                for(int i=5; i+1 < sql.size();i+=3){
+                    regex_size += 2;
+                    regex_command += sql[i] + " " + sql[i+1];
+                }
+                    
+                print_to_mj_log("regex: " + regex_command, true);
+                send_mj_message("M maple_sql 1 filter "+ sql[3] + " " + 
+                    to_string(regex_size) + " " + regex_command, 0);
+                send_mj_message("J juice_sql 1 filter output_filter_result 1 0", 0);                
+            } else { // Join
+                system("mkdir ./sdfs_files/input2");
+                send_mj_message("M maple_join 1 join "+ sql[3] + " 1 " + 
+                    sql[6], 0);
+                send_mj_message("J juice_join 1 join output_join_result 1 0", 0);   
             }
-                
-            print_to_mj_log("regex: " + regex_command, true);
-            send_mj_message("M maple_sql 1 sql "+ sql[3] + " " + 
-                to_string(regex_size) + " " + regex_command, 0);
-            send_mj_message("J juice_sql 1 sql sqlResult 0 0", 0);
+
         } else if (input == "Detection" || input == "detection" || 
                     input == "Detect" || input == "detect"){
             string file_name, target;
@@ -558,5 +567,13 @@ detect input/ Radio
 Test 2
 put TSI.csv input/TSI
 SELECT ALL FROM input/ WHERE Interconne None
+SELECT ALL FROM input/ WHERE Detection_ Video
+*/
+
+/*
+Test 3
+put TSI.csv input/TSI
+put TSI.csv input/TSI2
+SELECT ALL FROM input/ input/ WHERE Interconne = Interconne
 */
 
