@@ -10,7 +10,7 @@ maple_juice: membership.cpp sdfs.cpp maple_juice.cpp
 
 clean:
 	rm -rf sdfs_files
-	rm maple_juice
+	rm mj
 	rm  *.log
 
 .PHONY: clean

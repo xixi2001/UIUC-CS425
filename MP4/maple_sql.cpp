@@ -22,7 +22,7 @@ int main(int argc, char *argv[]){
     ifstream input(argv[1]);
         for(int i=2; i+1 < argc; i+=2) {
         regex_map[string(argv[i])] = regex (argv[i+1]);
-        cout << argv[i] << " "<< argv[i+1] << endl;
+        // cout << argv[i] << " "<< argv[i+1] << endl;
     }
     // for(const auto &[field, regex] : regex_map ) {
     //     cout << field << ": " << regex << endl;

@@ -25,9 +25,11 @@ int main(int argc, char *argv[]){
             count++;
         }
         total++;
+        key = p[0];
     }
     
-    cout << key << " " << float(count/total) << endl;
+    cout << key << " ";
+    printf("%.2f%\n", 100.0 * count/total);
 
     return 0;
 }

@@ -226,8 +226,8 @@ void work_maple_task(const string& cmd, int socket_num){
     vector<string> info = tokenize(cmd, ' ');
     system("mkdir ./local_input_maple");
 
-    int cmd_para_size = stoi(info[6]);string cmd_para;
-    for(int i = 7; i < 7 + cmd_para_size; i++){
+    int cmd_para_size = stoi(info[5]);string cmd_para;
+    for(int i = 6; i < 6 + cmd_para_size; i++){
         cmd_para += info[i] + " ";
     }
     print_to_mj_log("Maple task parameter: " + cmd_para , false);
@@ -242,7 +242,7 @@ void work_maple_task(const string& cmd, int socket_num){
             find_master(membership_set, hash_string(info[i], true)));
         files_to_be_got.push_back("./local_input_maple/"+file_name);
     }
-    this_thread::sleep_for(chrono::milliseconds(500));
+    this_thread::sleep_for(chrono::milliseconds(100));
     wait_until_all_files_are_processed(files_to_be_got);
     print_to_mj_log("[worker]: All files are received", false);
     
@@ -261,9 +261,18 @@ void work_maple_task(const string& cmd, int socket_num){
     map<string, vector<string>> maple_result;
     
     ifstream infile("./local_result_maple/temp_result");
-    string k, v;
-    while (infile >> k >> v)
+    string input_line;
+    while(getline(infile, input_line)) {
+        vector<string> tmp = tokenize(input_line, ' ');
+        string k = tmp[0];
+        string v;
+        if(tmp.size() >= 2) {
+            v = tmp[1];
+            for(int i=2;i<tmp.size(); i++)
+                v = ' ' + tmp[i];
+        }
         maple_result[k].push_back(v);
+    }
 
     infile.close();
     auto two_digit_index = [](int machine_idx) {
@@ -290,10 +299,10 @@ void work_maple_task(const string& cmd, int socket_num){
         thread(send_file, "./local_result_maple/" + filename, filename, find_master(membership_set, hash_string(filename, true)), "P", false).detach();
         files_to_be_sent.push_back("./local_result_maple/" + filename);
     }
-    this_thread::sleep_for(chrono::milliseconds(500));
+    this_thread::sleep_for(chrono::milliseconds(100));
     wait_until_all_files_are_processed(files_to_be_sent);
     // Still need to wait for slave files to be transferred, large file might cause error here
-    this_thread::sleep_for(chrono::milliseconds(500)); 
+    this_thread::sleep_for(chrono::milliseconds(100)); 
     
     // send success (S message) to leader & delete temp files
     int nbytes;
@@ -314,8 +323,8 @@ void work_juice_task(const string& cmd, int socket_num){
     vector<string> info = tokenize(cmd, ' ');
     system("mkdir ./local_input_juice");
 
-    int cmd_para_size = stoi(info[7]);string cmd_para;
-    for(int i = 8; i < 8 + cmd_para_size; i++){
+    int cmd_para_size = stoi(info[6]);string cmd_para;
+    for(int i = 7; i < 7 + cmd_para_size; i++){
         cmd_para += info[i] + " ";
     }
     print_to_mj_log("Juice task parameter: " + cmd_para, false);
@@ -328,7 +337,7 @@ void work_juice_task(const string& cmd, int socket_num){
         send_a_sdfs_message("G"+info[i]+" "+"./local_input_juice/"+file_name+" "+to_string(machine_idx), find_master(membership_set, hash_string(info[i], false)));
         files_to_be_got.push_back("./local_input_juice/"+file_name);
     }
-    this_thread::sleep_for(chrono::milliseconds(500));
+    this_thread::sleep_for(chrono::milliseconds(100));
     wait_until_all_files_are_processed(files_to_be_got);
     print_to_mj_log("[worker]: All files are received", false);
 
@@ -360,10 +369,10 @@ void work_juice_task(const string& cmd, int socket_num){
     thread(send_file, "./local_result_juice/" + filename, filename, find_master(membership_set, hash_string(filename, true)), "P", false).detach();
     files_to_be_sent.push_back("./local_result_juice/" + filename);
     
-    this_thread::sleep_for(chrono::milliseconds(500));
+    this_thread::sleep_for(chrono::milliseconds(100));
     wait_until_all_files_are_processed(files_to_be_sent);
     // Still need to wait for slave files to be transferred, large file might cause error here
-    this_thread::sleep_for(chrono::milliseconds(500)); 
+    this_thread::sleep_for(chrono::milliseconds(100)); 
     
     // send success (S message) to leader & delete temp files
     int nbytes;
@@ -513,7 +522,7 @@ int main(int argc, char *argv[]){
             }
                 
             print_to_mj_log("regex: " + regex_command, true);
-            send_mj_message("M maple_sql 1 sql "+ sql[3] + 
+            send_mj_message("M maple_sql 1 sql "+ sql[3] + " " + 
                 to_string(regex_size) + " " + regex_command, 0);
             send_mj_message("J juice_sql 1 sql sqlResult 0 0", 0);
         } else if (input == "Detection" || input == "detection" || 
@@ -534,4 +543,16 @@ int main(int argc, char *argv[]){
 // put C input/C
 // maple maple_test 3 wc input/
 // juice juice_test 3 wc wcResult 0
+
+/*
+Test 1
+put TSI.csv input/TSI
+detect input/ Radio
+*/
+
+/*
+Test 2
+put TSI.csv input/TSI
+SELECT ALL FROM input/ WHERE Interconne None
+*/
 
