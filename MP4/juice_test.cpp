@@ -18,14 +18,16 @@ int main(int argc, char *argv[]){
     
     string line;
     string key;
-    int count = 0;
+    int count = 0, total = 0;
     while (getline(cin, line)){
         vector<string> p = tokenize(line, ' ');
-        key = p[0];
-        count++;
+        if(p[1][0] == '1'){
+            count++;
+        }
+        total++;
     }
-
-    if(count != 0) cout << key << " " << count << endl;
+    
+    cout << key << " " << float(count/total) << endl;
 
     return 0;
 }
