@@ -516,6 +516,12 @@ int main(int argc, char *argv[]){
             send_mj_message("M maple_sql 1 sql "+ sql[3] + 
                 to_string(regex_size) + " " + regex_command, 0);
             send_mj_message("J juice_sql 1 sql sqlResult 0 0", 0);
+        } else if (input == "Detection" || input == "detection" || 
+                    input == "Detect" || input == "detect"){
+            string file_name, target;
+            ss >> file_name >> target;
+            send_mj_message("M maple_test 1 detect "+ file_name + " 1 " + target, 0);
+            send_mj_message("J juice_test 1 detect detectResult 0 0", 0);
         } else {
             puts("Unsupported command!");
         }

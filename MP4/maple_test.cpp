@@ -30,9 +30,9 @@ int main(int argc, char *argv[]){
         bool ok = 1;
         vector<string> words = tokenize(line, ',');
         if(words[target_index] == tar) {
-            cout << "1" << endl;
+            cout << tar << " 1" << endl;
         } else {
-            cout << "0" << endl;
+            cout << tar << " 0" << endl;
         }
     }
 }
