@@ -21,6 +21,7 @@ int main(int argc, char *argv[]){
     string line;
     while (getline(cin, line)){
         vector<string> p = tokenize(line, ' ');
+        while(p.size() < 2)p.push_back(" ");
         cnt[p[1]]++;
         total++;
     }

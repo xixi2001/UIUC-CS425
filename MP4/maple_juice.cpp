@@ -264,14 +264,23 @@ void work_maple_task(const string& cmd, int socket_num){
 
     map<string, vector<string>> maple_result;
     
+    auto normolize_string = [](const string &str){
+        string res;
+        for(char c:str){
+            if(c != '/')res.push_back(c);
+        }
+        return res;
+    };
+
     ifstream infile("./local_result_maple/temp_result");
     string input_line;
     while(getline(infile, input_line)) {
         string k,v;
         for(int i=0;i<input_line.size();i++) {
             if(input_line[i] == ' ') {
-                if(input_line[i+1] == ' ')i++;
+                if(i==0 && input_line[i+1] == ' ')i++;
                 k = input_line.substr(0, i);
+                k = normolize_string(k);
                 v = input_line.substr(i+1);
                 maple_result[k].push_back(v);
                 break;
@@ -561,6 +570,9 @@ int main(int argc, char *argv[]){
 Test 1
 put TSI.csv input/TSI
 detect input/ Radio
+detect input/ Fiber
+detect input/ Fiber/Radio
+detect input/ None
 */
 
 /*
