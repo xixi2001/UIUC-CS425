@@ -376,7 +376,7 @@ void work_juice_task(const string& cmd, int socket_num){
     system("mkdir ./local_result_juice");
     for(int i = 8 + cmd_para_size; i < info.size(); i++){
         string file_name = info[i];
-        ifstream test("./local_input_maple/" + file_name);
+        ifstream test("./local_input_juice/" + file_name);
         if(test.fail()) {
             print_to_mj_log("[worker] file " + file_name + " not received!", true);
             close(socket_num);
