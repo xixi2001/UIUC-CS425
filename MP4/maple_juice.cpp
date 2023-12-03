@@ -530,12 +530,8 @@ int main(int argc, char *argv[]){
         } else if(input == "SELECT" || input == "select") {
             vector<string> sql = tokenize(input_line, ' ');
             if(sql[4] == "WHERE") {// Filter
-                string regex_command;int regex_size = 0;
-                for(int i=5; i+1 < sql.size();i+=3){
-                    regex_size += 2;
-                    regex_command += sql[i] + " " + sql[i+1];
-                }
-                    
+                string regex_command = sql[5];int regex_size = 1;
+
                 print_to_mj_log("regex: " + regex_command, true);
                 send_mj_message("M maple_sql 1 filter "+ sql[3] + " " + 
                     to_string(regex_size) + " " + regex_command, 0);
