@@ -523,6 +523,13 @@ void sdfs_message_receiver(){
                 }
                 master_files_lock.unlock();
 
+                slave_files_lock.lock();
+                for(const string &file:slave_files) {
+                    if(is_prefix(file, filename))
+                        ret += file + " ";
+                }
+                slave_files_lock.lock();
+
                 print_to_sdfs_log("Files under folder " + filename + ": " + ret, true);
 
                 if((nbytes=send(clifd, ret.c_str(), ret.size() ,0))<0){
@@ -554,7 +561,7 @@ string to_string(const set<string> s){
 }
 
 mutex files_under_folder_lock;
-vector<string> files_under_folder;
+set<string> files_under_folder;
 int file_folder_request_cnt;
 
 void send_a_sdfs_message(const string& str, int target_index){
@@ -620,7 +627,7 @@ void send_a_sdfs_message(const string& str, int target_index){
         files_under_folder_lock.lock();
         vector<string> files = tokenize(ret, ' ');
         for(const string &file : files) {
-            files_under_folder.push_back(file);
+            files_under_folder.insert(file);
         }
         file_folder_request_cnt--;
         files_under_folder_lock.unlock();
@@ -904,7 +911,10 @@ vector<string> get_files_from_folder(const string &prefix){
     }
 
     files_under_folder_lock.lock();
-    auto res = files_under_folder;
+    vector<string> res;
+    for(const auto &file : files_under_folder) {
+        res.push_back(file);
+    }
     files_under_folder_lock.unlock();
     return res;
 }
