@@ -528,7 +528,7 @@ void sdfs_message_receiver(){
                     if(is_prefix(file, filename))
                         ret += file + " ";
                 }
-                slave_files_lock.lock();
+                slave_files_lock.unlock();
 
                 print_to_sdfs_log("Files under folder " + filename + ": " + ret, true);
 
