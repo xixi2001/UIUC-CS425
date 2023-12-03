@@ -574,8 +574,9 @@ detect input/ None
 /*
 Test 2
 put TSI.csv input/TSI
-SELECT ALL FROM input/ WHERE Interconne None
-SELECT ALL FROM input/ WHERE Detection_ Video
+SELECT ALL FROM input/ WHERE "Video,Radio"
+SELECT ALL FROM input/ WHERE "Video.*Radio"
+SELECT ALL FROM input/ WHERE "Video|Radio"
 */
 
 /*
